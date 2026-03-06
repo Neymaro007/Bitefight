@@ -2,8 +2,8 @@
 // @name         BiteFight Bot Pro v24.0
 // @namespace    http://tampermonkey.net/
 // @version      24.0
-// @description  Ostateczna naprawa koła fortuny i ekstrakcji (zostawanie na stronie wyniku, odświeżanie po AJAX).
-// @author       Anonymous
+// @description  Ostateczna naprawa koła fortuny, ekstrakcji, ruin, optymalizacja GUI i logiki.
+// @author       ANONYMOUS
 // @match        https://*.bitefight.gameforge.com/*
 // @grant        none
 // @run-at       document-idle
@@ -24,7 +24,7 @@
     const fallbackWaitTime = 10 * 60 * 1000;
     const profilePageLoadDelay = 1000;
 
-    // Dynamicznie pobieramy serwer (np. https://s69-pl.bitefight.gameforge.com)
+    // Dynamicznie pobieramy serwer
     const baseURL = window.location.origin;
 
     const adventureLink = baseURL + "/city/adventure";
@@ -131,7 +131,6 @@
                 <option value="8">4:00:00 godz. </option>
             `;
         } else {
-            // Domyślnie używamy prędkości x6 dla pozostałych (61, 62, 64, 66, 68, 70)
             graveyardOptions = `
                 <option value="1">0:10:12 godz. </option>
                 <option value="2">0:20:24 godz. </option>
@@ -180,7 +179,7 @@
                 #bf-bot-panel::-webkit-scrollbar-thumb:hover { background: #a00000; }
             </style>
 
-           <h3 style="margin: 0 0 5px 0; text-align: center; color: #ff3333; text-transform: uppercase; letter-spacing: 2px; font-size: 15px; text-shadow: 2px 2px 4px black, 0 0 10px rgba(255,0,0,0.5);">BiteFight Bot v24.0</h3>
+            <h3 style="margin: 0 0 5px 0; text-align: center; color: #ff3333; text-transform: uppercase; letter-spacing: 2px; font-size: 15px; text-shadow: 2px 2px 4px black, 0 0 10px rgba(255,0,0,0.5);">BiteFight Bot v24.0</h3>
 
             <div style="text-align: center; margin-bottom: 12px;">
                 <label style="color:#aaa; font-size: 11px;">🌍 Serwer:</label>
@@ -354,19 +353,16 @@
 
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
-
-        // Wykrywanie aktualnego serwera i ustawianie go w liście rozwijanej
         const serverSelect = document.getElementById('bot-server-select');
+
         if (currentServerMatch) {
             serverSelect.value = currentServerMatch[1];
         }
 
-        // Akcja po wybraniu innego serwera - przeniesienie gracza
         serverSelect.addEventListener('change', (e) => {
             const newServer = e.target.value;
             window.location.href = `https://s${newServer}-pl.bitefight.gameforge.com/profile/index`;
         });
-
 
         function updateMainButtons(isRunning) {
             if (isRunning) {
@@ -406,18 +402,16 @@
             updateMainButtons(false);
         });
 
-       function setupCheckbox(id, storageKey, defaultValue) {
+        function setupCheckbox(id, storageKey, defaultValue) {
             const checkbox = document.getElementById(id);
             let savedState = localStorage.getItem(storageKey);
 
-            // Jeśli to nowy serwer i brakuje zapisu w pamięci, wymuszamy zapis domyślnej wartości
             if (savedState === null) {
                 localStorage.setItem(storageKey, defaultValue);
                 savedState = defaultValue.toString();
             }
 
             checkbox.checked = savedState === 'true';
-
             checkbox.addEventListener('change', (e) => {
                 localStorage.setItem(storageKey, e.target.checked);
             });
@@ -430,7 +424,6 @@
             if (savedVal) {
                 select.value = savedVal;
             } else {
-                // Jeśli brak zapisu, zabezpieczamy pamięć aktualną wartością widoczną w menu
                 localStorage.setItem(storageKey, select.value);
             }
 
@@ -438,7 +431,6 @@
                 localStorage.setItem(storageKey, e.target.value);
             });
         }
-
 
         const rankContainer = document.getElementById('bot-rank-checkboxes');
         const rankCbs = rankContainer.querySelectorAll('input[type="checkbox"]');
@@ -456,7 +448,7 @@
         const ruinsContainer = document.getElementById('bot-ruins-checkboxes');
         const ruinsCbs = ruinsContainer.querySelectorAll('input[type="checkbox"]');
         const savedRuins = localStorage.getItem('botCfg_RuinsLevels');
-        const activeRuins = savedRuins ? savedRuins.split(',') : ['1','2','3'];
+        const activeRuins = savedRuins ? savedRuins.split(',') : ['1','2','3','4','5'];
 
         ruinsCbs.forEach(cb => {
             cb.checked = activeRuins.includes(cb.value);
@@ -538,7 +530,7 @@
         setupSelect('bot-graveyard-time', 'botCfg_GraveyardTime');
     }
 
-   function getRandomDelay() {
+    function getRandomDelay() {
         const speed = localStorage.getItem('botCfg_ClickDelay') || 'normal';
         let min = 200, max = 800;
 
@@ -554,7 +546,6 @@
         setTimeout(() => window.location.href = url, getRandomDelay());
     }
 
-    // Nasza nowa funkcja odświeżania po oczekiwaniu:
     function waitAndRefresh(reason) {
         console.log(`TEST: Wstrzymuję bota. Powód: ${reason}. Czekam 10 minut...`);
         setTimeout(() => {
@@ -592,7 +583,7 @@
         };
     }
 
-   function applyLevelRestrictionsToGUI(stats) {
+    function applyLevelRestrictionsToGUI(stats) {
         const selectEl = document.getElementById('bot-potion-type');
         if (selectEl && stats) {
             Array.from(selectEl.options).forEach(opt => {
@@ -605,7 +596,6 @@
             }
         }
 
-        // Zabezpieczenie Ruin Pradziejów w GUI
         const cbRuins = document.getElementById('bot-toggle-ruins');
         if (cbRuins && stats) {
             if (stats.level < 50) {
@@ -620,18 +610,16 @@
         }
     }
 
-  async function attemptAttributesUpgrade(currentPage, stats) {
+    async function attemptAttributesUpgrade(currentPage, stats) {
         const savedAttrs = (localStorage.getItem('botCfg_AttrList') || '').split(',').filter(Boolean);
         if (savedAttrs.length === 0) return false;
 
         if (!currentPage.includes('/profile/index')) {
-            console.log("TEST: Przechodzę na profil by ulepszyć atrybuty.");
             goTo(profileLink); return true;
         }
 
         return new Promise((resolve) => {
             setTimeout(() => {
-                // Pobieramy wiersze bezpośrednio z tabeli atrybutów (#skills_tab)
                 const attrRows = document.querySelectorAll("#skills_tab table tr");
                 let actionTaken = false;
 
@@ -639,30 +627,21 @@
                     const labelTd = row.querySelector("td:first-child");
                     if (!labelTd) continue;
 
-                    // Nazwa atrybutu, np. "Siła"
                     const attrName = labelTd.textContent.replace(':', '').trim();
-
-                    // Jeśli ten atrybut nie jest zaznaczony w opcjach bota, pomijamy go
                     if (!savedAttrs.includes(attrName)) continue;
 
                     let cost = null;
-                    // Zgrywamy CAŁY tekst z wiersza (obejmuje oba ukryte tooltipy)
                     const rowText = row.textContent;
-
-                    // Szukamy ceny w całym tekście wiersza
                     const costMatch = rowText.match(/kosztuje:\s*([\d.]+)/i);
 
                     if (costMatch) {
-                        // Usuwamy kropki z formatowania (np. 8.592.534 -> 8592534) i zamieniamy na liczbę
                         cost = parseInt(costMatch[1].replace(/\./g, ''), 10);
                         localStorage.setItem('bot_attrCost_' + attrName, cost.toString());
                     }
 
-                    // Jeśli znamy koszt i bot nic jeszcze w tej pętli nie kliknął
                     if (!actionTaken && cost !== null) {
                         const plusBtnLink = row.querySelector("a[href*='/profile/training/']");
 
-                        // Sprawdzamy czy nas stać na ulepszenie
                         if (plusBtnLink && stats.gold >= cost) {
                             console.log(`TEST: Ulepszam '${attrName}' za ${cost} złota!`);
                             setTimeout(() => plusBtnLink.click(), getRandomDelay());
@@ -674,11 +653,10 @@
                 if (actionTaken) {
                     resolve(true);
                 } else {
-                    // Jeśli nas na nic nie stać, dajemy botowi 5 minut przerwy od sprawdzania statystyk
                     localStorage.setItem('bot_NextAttrCheck', (Date.now() + 5 * 60 * 1000).toString());
                     resolve(false);
                 }
-            }, profilePageLoadDelay); // Czekamy chwilę po wejściu na stronę by DOM zdążył się wyrenderować
+            }, profilePageLoadDelay);
         });
     }
 
@@ -710,12 +688,10 @@
                         }
 
                         const readyTimestamp = Date.now() + (waitSeconds * 1000) + 5000;
-                        console.warn(`TEST: '${itemName}' ma cooldown. Zaplanowano powrót o: ${new Date(readyTimestamp).toLocaleTimeString()}`);
                         localStorage.setItem(storageCooldown, readyTimestamp.toString());
                         resolve(false);
                     }
                 } else {
-                     console.warn(`TEST: Brak '${itemName}' w ekwipunku! Włączam moduł zakupów.`);
                      localStorage.setItem(storageNeedBuy, 'true');
                      resolve(false);
                 }
@@ -749,7 +725,6 @@
                         }
                     }
                 }
-                console.error(`TEST: Brak możliwości zakupu ${itemName}.`);
                 localStorage.removeItem(storageNeedBuy); resolve(false);
             }, profilePageLoadDelay);
         });
@@ -830,7 +805,6 @@
                             const availableUnit1 = parseInt(slider1.max || '0', 10);
                             const availableUnit2 = parseInt(slider2.max || '0', 10);
                             if (availableUnit1 < config.unit1 || availableUnit2 < config.unit2) {
-                                console.warn(`TEST: BŁĄD! Zbyt mało wojska na Poziom ${config.id}!`);
                                 localStorage.setItem(`nextRuin_${config.id}`, (Date.now() + 30 * 60 * 1000).toString());
                                 localStorage.removeItem('activeRuinTarget');
                                 goTo(adventureLink); resolve(true); return;
@@ -882,14 +856,12 @@
     }
 
     async function attemptHunting(currentPage, stats) {
-        // Ważna zmiana - musimy zezwolić skryptowi na działanie po wejściu na stronę z wynikiem polowania
         if (!currentPage.includes('/robbery/')) {
             goTo(huntLink); return true;
         }
 
         return new Promise((resolve) => {
             setTimeout(() => {
-                // ETAP 1: Ekstrakcja
                 const extractBtn = document.getElementById("extractBloodBtn");
                 const isExtractDisabled = extractBtn && (extractBtn.disabled || extractBtn.classList.contains('extractBloodDisabled'));
 
@@ -904,33 +876,20 @@
                     const allowedRanks = (localStorage.getItem('botCfg_HuntRanks') || 'S,A,B,C,D,E,F').split(',');
 
                     if (foundRank && allowedRanks.includes(foundRank)) {
-                        console.log(`TEST: 🔮 Znalazłem pożądaną Sferę Ekstrakcji (${foundRank} - Ranga). Pobieram!`);
-
-                        // Zwykłe kliknięcie w przycisk, które wywołuje grę (Ajax)
                         extractBtn.click();
 
-                        // Zatwierdzanie ewentualnego okienka po ułamku sekundy
                         setTimeout(() => {
                             const confirmModalBtn = document.getElementById("confirmModal_buttonLeft");
-                            if (confirmModalBtn) {
-                                console.log("TEST: Zatwierdzam okienko w grze.");
-                                confirmModalBtn.click();
-                            }
+                            if (confirmModalBtn) confirmModalBtn.click();
                         }, 800);
 
-                        // Skoro to był AJAX, musimy odświeżyć stronę na twardo, aby ujrzeć zmianę zegarów w slocie
-                        setTimeout(() => {
-                            window.location.href = huntLink;
-                        }, 2500);
+                        setTimeout(() => { window.location.href = huntLink; }, 2500);
 
                         resolve(true);
                         return;
-                    } else if (foundRank) {
-                        console.log(`TEST: 🔮 Znaleziona Sfera ma rangę ${foundRank} (wyłączona w opcjach).`);
                     }
                 }
 
-                // ETAP 2: Zegary
                 const allSlots = document.querySelectorAll(".slots .slot");
                 let activeTimersCount = 0;
                 let minTimeSeconds = Infinity;
@@ -958,13 +917,10 @@
 
                 const huntSpheresOnly = localStorage.getItem('botCfg_HuntSpheresOnly') === 'true';
 
-                // Uciekamy, jeśli wszystkie 3 miejsca pełne
                 if (areAllSlotsBusy && huntSpheresOnly) {
-                    console.log(`TEST: 🔮 Wszystkie sloty zapełnione. Przerwa na: ${Math.ceil(minTimeSeconds/60)} minut.`);
                     resolve(false); return;
                 }
 
-                // ETAP 3: Kręcenie kołem
                 const huntLoc = localStorage.getItem('botCfg_HuntLocation') || '1';
                 const apCost = huntLoc === '5' ? 2 : 1;
 
@@ -972,18 +928,14 @@
                     resolve(false); return;
                 }
 
-                // Sprawdzamy czy gra wygenerowała nam przycisk "Ponownie (-1 PA)" (KOŁO FORTUNY)
                 const ponownieBtn = Array.from(document.querySelectorAll("button[type='submit'].btn")).find(el => el.textContent.trim().toLowerCase().includes("ponownie"));
                 if (ponownieBtn) {
-                    console.log(`TEST: Wylosowano złą sferę. Kręcę kołem ponownie (koszt ${apCost} PA)!`);
                     setTimeout(() => ponownieBtn.click(), getRandomDelay());
                     resolve(true); return;
                 }
 
-                // Jeśli to nie okno z wynikiem, tylko strona główna polowań, idziemy w miasto!
                 const initBtn = document.querySelector(`button[onclick='doHunt(${huntLoc})']`);
                 if (initBtn) {
-                    console.log(`TEST: Rozpoczynam pierwsze Polowanie w wybranej lokacji!`);
                     setTimeout(() => initBtn.click(), getRandomDelay());
                     resolve(true); return;
                 }
@@ -995,47 +947,31 @@
         });
     }
 
-   async function attemptTraining(currentPage, stats) {
+    async function attemptTraining(currentPage, stats) {
         const unitId = localStorage.getItem('botCfg_TrainUnit') || '1';
         const costPerUnit = unitCosts[unitId] || 10;
 
-        // Jeśli nie stać nas nawet na 1 sztukę, przerywamy
         if (stats.blood < costPerUnit) return false;
 
-        // Jeśli nie jesteśmy na stronie Jamy Lęgowej, idziemy tam
         if (!currentPage.includes('/nourishing/index')) {
             goTo(trainLink); return true;
         }
 
         return new Promise((resolve) => {
             setTimeout(() => {
-                // Jeśli stać nas na 10 sztuk, próbujemy kliknąć przycisk dla 10.
-                // W przeciwnym razie klikamy przycisk dla 1 sztuki.
                 const amountToBuy = (stats.blood >= costPerUnit * 10) ? 10 : 1;
-
-                // Generujemy ID przycisku na podstawie wyboru jednostki i obliczonej ilości
                 const btnId = `recruits-${unitId}-${amountToBuy}`;
                 const trainBtn = document.getElementById(btnId);
 
-                // Sprawdzamy, czy przycisk istnieje i czy nie jest zablokowany (np. przez odliczanie/kolejkę)
                 if (trainBtn && !trainBtn.classList.contains('disabled')) {
-                    console.log(`TEST: Kupuję ${amountToBuy} szt. wojska (ID: ${unitId}).`);
-
                     setTimeout(() => {
                         trainBtn.click();
-
-                        // Dodajemy wymuszone odświeżenie po 1.5 sekundy
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
-
+                        setTimeout(() => { window.location.reload(); }, 1500);
                     }, getRandomDelay());
 
                     resolve(true);
                     return;
                 } else {
-                    // Zabezpieczenie: jeśli przyciski są zablokowane (np. pełna kolejka szkolenia), wracamy do przygód
-                    console.log("TEST: Kolejka pełna lub przycisk zablokowany. Wracam do przygód.");
                     goTo(adventureLink);
                     resolve(true);
                     return;
@@ -1145,7 +1081,6 @@
                 const attackBtn = document.querySelector(`input[type="submit"][name="difficulty"][value="${diff}"]`);
 
                 if (attackBtn) {
-                    console.log(`TEST: Atakuję Grotę (Trudność: ${diff})`);
                     attackBtn.style.border = '3px solid gold';
                     setTimeout(() => attackBtn.click(), getRandomDelay());
                     resolve(true);
@@ -1169,21 +1104,16 @@
 
         const isOnAdventurePage = currentPage.includes('/city/adventure');
 
-        // 1. EKRAN PODSUMOWANIA: Tutaj kulturalnie kończymy przygodę i wychodzimy z lasu
         if (wantsToExit && przyciskKontynuuj && przyciskZakoncz) {
-            console.log("TEST: Misja w lesie ukończona. Wychodzę z lasu do Groty!");
             przyciskZakoncz.style.border = '3px solid red';
             setTimeout(() => przyciskZakoncz.click(), getRandomDelay());
             return;
         }
 
-        // 2. EKRAN STARTOWY: Jeśli chcemy wyjść (np. do Groty), a nie ma misji w toku, nie klikamy Startu!
         if (wantsToExit && (przyciskTawerna || przyciskStartQuest)) {
-            console.log("TEST: Pusty las. Nie zaczynam nowej misji, idę robić coś innego.");
-            return; // Bot wychodzi z tej funkcji, a główny router (mainLogic) odpali np. Grotę
+            return;
         }
 
-        // 3. W TRAKCIE MISJI: Normalny przepływ (gramy aż do pojawienia się ekranu podsumowania)
         if (przyciskTawerna) {
             przyciskTawerna.style.border = '3px solid limegreen'; setTimeout(() => przyciskTawerna.click(), getRandomDelay());
         } else if (przyciskStartQuest) {
@@ -1193,7 +1123,6 @@
         } else if (przyciskKontynuujPosredni) {
             przyciskKontynuujPosredni.style.border = '3px solid orange'; setTimeout(() => przyciskKontynuujPosredni.click(), getRandomDelay());
         } else if (przyciskDecyzji) {
-            // Podajemy twarde "false", aby bot ignorował polecenie ucieczki W TRAKCIE FABUŁY i dokończył zadanie
             findAndClickChoice(false);
         } else if (!isOnAdventurePage) {
             goTo(adventureLink);
@@ -1222,7 +1151,6 @@
 
         const doChurch = localStorage.getItem('botCfg_Church') !== 'false';
         const doClan = localStorage.getItem('botCfg_Clan') !== 'false';
-        // Ruiny włączają się TYLKO wtedy, gdy są zaznaczone ORAZ gdy poziom postaci to minimum 50
         const doRuins = localStorage.getItem('botCfg_Ruins') !== 'false' && stats.level >= 50;
         const doHunt = localStorage.getItem('botCfg_Hunt') === 'true';
         const doTrain = localStorage.getItem('botCfg_Train') === 'true';
@@ -1230,7 +1158,7 @@
         const doAdventure = localStorage.getItem('botCfg_Adventure') !== 'false';
         const doGrotte = localStorage.getItem('botCfg_Grotte') === 'true';
         const doGraveyard = localStorage.getItem('botCfg_Graveyard') !== 'false';
-        // Pobieramy wartość z panelu bota, domyślnie ustawiając 0.50 (50%)
+
         const healthSafePercent = parseFloat(localStorage.getItem('botCfg_SafeHp') || '0.50');
 
         const currentPage = window.location.href;
@@ -1304,7 +1232,7 @@
         let wantsToExit = false;
 
         let wantsToRuin = false;
-        const activeRuinsLevels = (localStorage.getItem('botCfg_RuinsLevels') || '1,2,3').split(',').map(Number);
+        const activeRuinsLevels = (localStorage.getItem('botCfg_RuinsLevels') || '1,2,3,4,5').split(',').map(Number);
         const activeRuinsConfig = ruinsLevels.filter(r => activeRuinsLevels.includes(r.id));
 
         if (doRuins) {
@@ -1330,11 +1258,10 @@
             if (!huntSpheresOnly || Date.now() >= nextSphereTime) wantsToHunt = true;
         }
 
-       let wantsToTrain = false;
+        let wantsToTrain = false;
         if (doTrain) {
             const unitId = localStorage.getItem('botCfg_TrainUnit') || '1';
             const costPerUnit = unitCosts[unitId] || 10;
-            // Zmieniliśmy warunek: bot chce trenować, jeśli stać go na minimum 1 sztukę
             if (stats.blood >= costPerUnit) wantsToTrain = true;
         }
 
@@ -1343,26 +1270,18 @@
             const nextAttrCheck = parseInt(localStorage.getItem('bot_NextAttrCheck') || '0', 10);
             const activeAttrs = (localStorage.getItem('botCfg_AttrList') || '').split(',').filter(Boolean);
 
-            console.log(`TEST Atrybutów: Moduł włączony. Zaznaczone statystyki: ${activeAttrs.length > 0 ? activeAttrs.join(', ') : 'BRAK!'}`);
-
             if (Date.now() > nextAttrCheck) {
                 for (const attr of activeAttrs) {
                     const savedCost = localStorage.getItem('bot_attrCost_' + attr);
 
                     if (!savedCost || isNaN(savedCost)) {
-                        console.log(`TEST Atrybutów: Brak poprawnej ceny dla '${attr}'. Muszę iść na profil ją sprawdzić!`);
                         wantsToUpgrade = true;
                         break;
                     } else if (stats.gold >= parseInt(savedCost, 10)) {
-                        console.log(`TEST Atrybutów: Stać mnie na '${attr}'! (Koszt: ${savedCost}, Moje złoto: ${stats.gold}). Idę na profil!`);
                         wantsToUpgrade = true;
                         break;
-                    } else {
-                        console.log(`TEST Atrybutów: Za mało złota na '${attr}'. Koszt: ${savedCost}, Złoto: ${stats.gold}`);
                     }
                 }
-            } else {
-                console.log(`TEST Atrybutów: Bot odpoczywa po ostatnim sprawdzeniu. Koniec przerwy za: ${Math.round((nextAttrCheck - Date.now()) / 1000)} sekund.`);
             }
         }
 
@@ -1376,14 +1295,13 @@
         if (doGrotte && stats.currentAP < 1) wantsToExit = true;
         if (!doAdventure && !doGrotte && stats.currentAP < 1) wantsToExit = true;
 
-        if (typeof healthSafePercent !== 'undefined' && stats.currentHP < (stats.maxHP * healthSafePercent)) wantsToExit = true;
+        if (stats.currentHP < (stats.maxHP * healthSafePercent)) wantsToExit = true;
         if (wantsToRuin || wantsToHunt || wantsToTrain || wantsToWork) wantsToExit = true;
 
         // =========================================================================
         // REALIZACJA MODUŁÓW
         // =========================================================================
 
-        // Bot pójdzie na profil kupić atrybut, nawet jeśli jest w środku lasu!
         if (wantsToUpgrade) {
             const isUpgrading = await attemptAttributesUpgrade(currentPage, stats);
             if (isUpgrading) return;
@@ -1427,17 +1345,13 @@
         // ZABEZPIECZENIE PRZED ŚMIERCIĄ
         // =========================================================================
         if (stats.currentHP < (stats.maxHP * healthSafePercent) && !isBusyInAdventure) {
-            waitAndRefresh("Zdrowie poniżej bezpiecznego progu (50%). Czekam na regenerację");
+            waitAndRefresh(`Zdrowie poniżej bezpiecznego progu (${Math.round(healthSafePercent*100)}%). Czekam na regenerację`);
             return;
         }
 
-        // PRIORYTET 3: PRZYGODA W LESIE (lub kulturalne wyjście z niej)
-        // Jeśli jesteśmy w trakcie przygody, MUSIMY ją najpierw zakończyć, nawet jeśli opcja Przygód została odznaczona.
+        // PRIORYTET 3: PRZYGODA W LESIE
         if (isBusyInAdventure || (doAdventure && stats.currentAP >= 3)) {
-
-            // Jeśli gracz odznaczył Przygody (bo włączył Grotę), zmuszamy bota do kliknięcia "Zakończ przygodę"
             const forceExit = wantsToExit || !doAdventure;
-
             runAdventureLogic(currentPage, forceExit);
             return;
         }
@@ -1448,13 +1362,11 @@
             if (isDoingGrotte) return;
         }
 
-    // =========================================================================
+        // =========================================================================
         // TRYB BEZCZYNNOŚCI (IDLE) - Gdy bot nie ma nic do zrobienia
         // =========================================================================
-        // Jeśli kod dotarł tutaj, oznacza to, że bot nie wywołał "return" (nie kliknął niczego).
-        // Czekamy losowo od 2 do 5 minut i odświeżamy stronę, by sprawdzić liczniki czasu.
-        const idleMin = 2 * 60 * 1000; // 2 minuty
-        const idleMax = 5 * 60 * 1000; // 5 minut
+        const idleMin = 2 * 60 * 1000;
+        const idleMax = 5 * 60 * 1000;
         const idleTime = Math.floor(Math.random() * (idleMax - idleMin + 1)) + idleMin;
 
         console.log(`TEST: Brak zadań (Bezczynność). Odświeżę stronę za około ${Math.round(idleTime / 1000 / 60)} min...`);
@@ -1463,7 +1375,7 @@
             window.location.reload();
         }, idleTime);
 
-    } // Zakończenie funkcji mainLogic
+    }
 
     setTimeout(mainLogic, 500);
 
