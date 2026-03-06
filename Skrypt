@@ -1,0 +1,1348 @@
+// ==UserScript==
+// @name         BiteFight s70 Bot Pro v24.0
+// @namespace    http://tampermonkey.net/
+// @version      24.0
+// @description  Ostateczna naprawa koła fortuny i ekstrakcji (zostawanie na stronie wyniku, odświeżanie po AJAX).
+// @author       Shakira
+// @match        https://s70-pl.bitefight.gameforge.com/*
+// @grant        none
+// @run-at       document-idle
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    //==================================================================
+    // 📜 KONFIGURACJA 📜
+    //==================================================================
+
+    const clickDelayMin = 200;
+    const clickDelayMax = 800;
+
+    const healthTriggerPercent = 0.85;
+    const healthCriticalPercent = 0.15;
+
+    const potionScriptCooldown = 31 * 60 * 1000;
+    const churchScriptCooldown = 121 * 60 * 1000;
+    const fallbackWaitTime = 10 * 60 * 1000;
+    const profilePageLoadDelay = 1000;
+
+    const adventureLink = "https://s70-pl.bitefight.gameforge.com/city/adventure";
+    const profileLink = "https://s70-pl.bitefight.gameforge.com/profile/index";
+    const churchLink = "https://s70-pl.bitefight.gameforge.com/city/church";
+    const marketLink = "https://s70-pl.bitefight.gameforge.com/city/shop/potions/";
+    const clanLink = "https://s70-pl.bitefight.gameforge.com/clan/index";
+    const huntLink = "https://s70-pl.bitefight.gameforge.com/robbery/index";
+    const graveyardLink = "https://s70-pl.bitefight.gameforge.com/city/graveyard";
+    const trainLink = "https://s70-pl.bitefight.gameforge.com/nourishing/index";
+    const grotteLink = "https://s70-pl.bitefight.gameforge.com/city/grotte";
+
+    const potionEnergyName = "Mikstura Energii";
+
+    const ruinsCooldown = 61 * 60 * 1000;
+    const ruinsLevels = [
+        { id: 1, unit1: 4, unit2: 4 },
+        { id: 2, unit1: 7, unit2: 5 },
+        { id: 3, unit1: 11, unit2: 6 },
+        { id: 4, unit1: 13, unit2: 8 },
+        { id: 5, unit1: 15, unit2: 10 }
+    ];
+
+    const clanWarCooldown = 30 * 60 * 1000;
+
+    const adventureStrategies = {
+        'exp_gold': {
+            name: "Max EXP i Złoto",
+            priority: ['Zaurocz', 'Pożryj', 'Wrzuć monetę', 'Skonfrontuj wroga', 'Do ataku!', 'Zamorduj podstępnie', 'Wejdź do lasu', 'Splądruj', 'Zdobądź niezły łup', 'Podpal wszystko', 'Wykorzystaj szansę', 'Zostań tutaj', 'Bądź odważny', 'Sprawdź', 'Rozejrzyj się'],
+            avoid: ['Terroryzuj', 'Pogódź się z tym', 'Zakończ przygodę', 'Uciekaj']
+        },
+        'aspect_human': {
+            name: "Aspekt: Człowiek",
+            priority: ['Ostrzeż przed niebezpieczeństwem', 'Porozmawiaj', 'Bądź odważny', 'Baw się dobrze', 'Zostań tutaj'],
+            avoid: ['Zamorduj podstępnie', 'Do ataku!', 'Podpal wszystko', 'Zakończ przygodę', 'Pogódź się z tym', 'Terroryzuj']
+        },
+        'aspect_knowledge': {
+            name: "Aspekt: Wiedza",
+            priority: ['Sprawdź', 'Przeczytaj', 'Rozejrzyj się', 'Porozmawiaj', 'Ostrzeż przed niebezpieczeństwem'],
+            avoid: ['Podpal wszystko', 'Do ataku!', 'Zniszcz', 'Zakończ przygodę', 'Pogódź się z tym']
+        },
+        'aspect_order': {
+            name: "Aspekt: Porządek",
+            priority: ['Skonfrontuj wroga', 'Bądź odważny', 'Ostrzeż przed niebezpieczeństwem', 'Sprawdź'],
+            avoid: ['Zamorduj podstępnie', 'Terroryzuj', 'Splądruj', 'Zakończ przygodę', 'Wrzuć monetę', 'Pogódź się z tym']
+        },
+        'aspect_nature': {
+            name: "Aspekt: Natura",
+            priority: ['Ukryj się', 'Zostań tutaj', 'Obserwuj', 'Idź ostrożnie', 'Przeskocz'],
+            avoid: ['Podpal wszystko', 'Do ataku!', 'Zniszcz', 'Zakończ przygodę', 'Pogódź się z tym']
+        },
+        'aspect_beast': {
+            name: "Aspekt: Bestia",
+            priority: ['Do ataku!', 'Pożryj', 'Śmiertelna aura', 'Terroryzuj'],
+            avoid: ['Porozmawiaj', 'Ostrzeż przed niebezpieczeństwem', 'Ukryj się', 'Zakończ przygodę', 'Pogódź się z tym']
+        },
+        'aspect_destruction': {
+            name: "Aspekt: Zniszczenie",
+            priority: ['Podpal wszystko', 'Zniszcz', 'Do ataku!', 'Terroryzuj'],
+            avoid: ['Sprawdź', 'Zostań tutaj', 'Porozmawiaj', 'Przeczytaj', 'Zakończ przygodę', 'Pogódź się z tym']
+        },
+        'aspect_chaos': {
+            name: "Aspekt: Chaos",
+            priority: ['Wykorzystaj szansę', 'Przeskocz', 'Zniszcz', 'Podpal wszystko'],
+            avoid: ['Skonfrontuj wroga', 'Sprawdź', 'Ostrzeż przed niebezpieczeństwem', 'Zakończ przygodę', 'Pogódź się z tym']
+        },
+        'aspect_corruption': {
+            name: "Aspekt: Korupcja",
+            priority: ['Zamorduj podstępnie', 'Splądruj', 'Zdobądź niezły łup', 'Zaurocz', 'Terroryzuj'],
+            avoid: ['Skonfrontuj wroga', 'Ostrzeż przed niebezpieczeństwem', 'Bądź odważny', 'Zakończ przygodę', 'Pogódź się z tym']
+        }
+    };
+
+    const unitCosts = {
+        '1': 10, '2': 15, '3': 20, '4': 35
+    };
+
+    //==================================================================
+    // 🤖 RDZEŃ SKRYPTU (GUI) 🤖
+    //==================================================================
+
+    function createBotPanel() {
+        if (document.getElementById('bf-bot-panel')) return;
+
+        const panel = document.createElement('div');
+        panel.id = 'bf-bot-panel';
+        panel.style.cssText = `
+            position: fixed; top: 10px; left: 10px; width: 290px;
+            background: linear-gradient(180deg, #1a0a0a 0%, #0d0404 100%);
+            border: 2px solid #7a0000; color: #d4d4d4;
+            padding: 12px; z-index: 999999; font-family: Tahoma, Arial, sans-serif;
+            font-size: 12px; border-radius: 8px; box-shadow: 3px 3px 20px rgba(0,0,0,0.9);
+            max-height: 95vh; overflow-y: auto; overflow-x: hidden;
+        `;
+
+        panel.innerHTML = `
+            <style>
+                #bf-bot-panel * { box-sizing: border-box; }
+                .bf-sec { background: rgba(20, 5, 5, 0.6); border: 1px solid #4a1515; border-radius: 6px; padding: 10px; margin-bottom: 12px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+                .bf-sec-main { border: 1px solid #8a1515; background: rgba(30, 8, 8, 0.8); box-shadow: 0 0 8px rgba(138, 0, 0, 0.3) inset; }
+                .bf-sec-title { margin: 0 0 10px 0; font-weight: bold; color: #ff5555; font-size: 13px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #4a1010; padding-bottom: 5px; text-shadow: 1px 1px 2px black; }
+                .bf-row { display: flex; align-items: center; margin-bottom: 8px; justify-content: space-between; }
+                .bf-row-left { display: flex; align-items: center; margin-bottom: 8px; justify-content: flex-start; gap: 8px;}
+                .bf-row label, .bf-row-left label { cursor: pointer; display: flex; align-items: center; gap: 6px; color: #e0e0e0; font-size: 12px; }
+                .bf-sel { width: 100%; background: #0a0404; color: #ffdddd; border: 1px solid #661111; padding: 5px; border-radius: 4px; font-size: 11px; margin-top: 2px; outline: none; cursor: pointer; transition: 0.2s;}
+                .bf-sel:hover { border-color: #aa2222; }
+                .bf-sel option:disabled { color: #555; background: #0a0404; }
+                .bf-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
+                .bf-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
+                .bf-badge { background: #2a0b0b; border: 1px solid #551111; border-radius: 4px; padding: 4px 0; text-align: center; cursor: pointer; color: #ccc; display: flex; align-items: center; justify-content: center; gap: 4px; transition: 0.2s;}
+                .bf-badge:hover { background: #501010; color: #fff; border-color: #882222; }
+                .bf-badge input { margin: 0; cursor: pointer; }
+                .bf-hr { border: 0; height: 1px; background: linear-gradient(90deg, transparent, #551111, transparent); margin: 10px 0; }
+
+                #bf-bot-panel::-webkit-scrollbar { width: 6px; }
+                #bf-bot-panel::-webkit-scrollbar-track { background: #0d0404; border-radius: 4px; }
+                #bf-bot-panel::-webkit-scrollbar-thumb { background: #7a0000; border-radius: 4px; }
+                #bf-bot-panel::-webkit-scrollbar-thumb:hover { background: #a00000; }
+            </style>
+
+            <h3 style="margin: 0 0 15px 0; text-align: center; color: #ff3333; text-transform: uppercase; letter-spacing: 2px; font-size: 15px; text-shadow: 2px 2px 4px black, 0 0 10px rgba(255,0,0,0.5);">BiteFight Bot v24.0</h3>
+
+            <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                <button id="btn-start" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; border: 1px solid #00aa00; background: linear-gradient(180deg, #004400, #002200); color: #fff; cursor: pointer; border-radius: 5px; transition: 0.3s; text-shadow: 1px 1px 2px black;">▶ START</button>
+                <button id="btn-stop" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; border: 1px solid #aa0000; background: linear-gradient(180deg, #440000, #220000); color: #fff; cursor: pointer; border-radius: 5px; transition: 0.3s; text-shadow: 1px 1px 2px black;">⏹ STOP</button>
+            </div>
+
+            <div class="bf-sec bf-sec-main">
+                <div class="bf-sec-title">⚔️ Główna Aktywność (Wybierz 1)</div>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-adventure"> 🌲 Przygoda w Lesie</label></div>
+                <select id="bot-adv-strategy" class="bf-sel" style="margin-bottom: 10px;">
+                    <option value="exp_gold">⚔️ Max EXP i Złoto</option>
+                    <option value="aspect_human">👤 Aspekt: Człowiek</option>
+                    <option value="aspect_knowledge">📖 Aspekt: Wiedza</option>
+                    <option value="aspect_order">⚖️ Aspekt: Porządek (+HP)</option>
+                    <option value="aspect_nature">🌿 Aspekt: Natura</option>
+                    <option value="aspect_beast">🐺 Aspekt: Bestia</option>
+                    <option value="aspect_destruction">🔥 Aspekt: Zniszczenie</option>
+                    <option value="aspect_chaos">🌪️ Aspekt: Chaos</option>
+                    <option value="aspect_corruption">🧛 Aspekt: Korupcja</option>
+                </select>
+
+                <div class="bf-hr"></div>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-grotte"> 🦇 Polowanie w Grocie</label></div>
+                <select id="bot-grotte-diff" class="bf-sel">
+                    <option value="Łatwe">🟢 Poziom: Łatwe</option>
+                    <option value="Średnie">🟡 Poziom: Średnie</option>
+                    <option value="Trudne">🔴 Poziom: Trudne</option>
+                </select>
+            </div>
+
+            <div class="bf-sec">
+                <div class="bf-sec-title">🧛 Polowanie na Ludzi</div>
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-hunt"> Aktywuj Polowanie</label></div>
+                <select id="bot-hunt-location" class="bf-sel">
+                    <option value="1">Farma (1 PA)</option>
+                    <option value="2">Wioska (1 PA)</option>
+                    <option value="3">Małe miasteczko (1 PA)</option>
+                    <option value="4">Miasto (1 PA)</option>
+                    <option value="5">Metropolia (2 PA)</option>
+                </select>
+
+                <div style="margin-top: 10px; color: #aaa; font-size: 10px; text-align: center;">Odbieraj Sfery tych Rang:</div>
+                <div class="bf-grid-4" id="bot-rank-checkboxes">
+                    <label class="bf-badge"><input type="checkbox" value="S"> S</label>
+                    <label class="bf-badge"><input type="checkbox" value="A"> A</label>
+                    <label class="bf-badge"><input type="checkbox" value="B"> B</label>
+                    <label class="bf-badge"><input type="checkbox" value="C"> C</label>
+                    <label class="bf-badge"><input type="checkbox" value="D"> D</label>
+                    <label class="bf-badge"><input type="checkbox" value="E"> E</label>
+                    <label class="bf-badge"><input type="checkbox" value="F"> F</label>
+                </div>
+
+                <div class="bf-row-left" style="margin-top: 10px; margin-bottom: 0;">
+                    <label title="Gdy bot zapełni sloty odliczaniem, przerwie polowania.">
+                        <input type="checkbox" id="bot-toggle-hunt-spheres-only"> 🔮 Tylko po Sfery Ekstrakcji
+                    </label>
+                </div>
+            </div>
+
+            <div class="bf-sec">
+                <div class="bf-sec-title">🏰 Walka i Ruiny</div>
+                <div class="bf-row-left"><label><input type="checkbox" id="bot-toggle-clan"> Zapisuj na Wojny Klanowe</label></div>
+
+                <div class="bf-hr"></div>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-ruins"> Ruiny Pradziejów</label></div>
+                <div style="color: #aaa; font-size: 10px; margin-left: 24px; margin-bottom: 4px;">Wybierz poziomy do ataku:</div>
+                <div class="bf-grid-3" id="bot-ruins-checkboxes" style="margin-left: 24px;">
+                    <label class="bf-badge"><input type="checkbox" value="1"> Poz. 1</label>
+                    <label class="bf-badge"><input type="checkbox" value="2"> Poz. 2</label>
+                    <label class="bf-badge"><input type="checkbox" value="3"> Poz. 3</label>
+                    <label class="bf-badge"><input type="checkbox" value="4"> Poz. 4</label>
+                    <label class="bf-badge"><input type="checkbox" value="5"> Poz. 5</label>
+                </div>
+            </div>
+
+            <div class="bf-sec">
+                <div class="bf-sec-title">💎 Rozwój Postaci</div>
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-attributes"> Trenuj Atrybuty (Złoto):</label></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-left: 24px; margin-top: 5px;">
+                    <label class="bf-badge"><input type="checkbox" id="attr-strength" value="Siła"> Siła</label>
+                    <label class="bf-badge"><input type="checkbox" id="attr-defense" value="Obrona"> Obrona</label>
+                    <label class="bf-badge"><input type="checkbox" id="attr-agility" value="Zwinność"> Zwinność</label>
+                    <label class="bf-badge"><input type="checkbox" id="attr-endurance" value="Wytrzymałość"> Wytrzym.</label>
+                    <label class="bf-badge" style="grid-column: span 2;"><input type="checkbox" id="attr-charisma" value="Charyzma"> Charyzma</label>
+                </div>
+
+                <div class="bf-hr"></div>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-train"> Jamy Lęgowe (Wojsko)</label></div>
+                <select id="bot-train-unit" class="bf-sel" style="margin-left: 24px; width: calc(100% - 24px);">
+                    <option value="1">Rój Nietoperzy</option>
+                    <option value="2">Ghul</option>
+                    <option value="3">Wampirzy Niewolnik</option>
+                    <option value="4">Banshee</option>
+                </select>
+            </div>
+
+            <div class="bf-sec" style="margin-bottom: 0;">
+                <div class="bf-sec-title">🩸 Przetrwanie i Regeneracja</div>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-potion-life"> Pij Mikstury Leczące:</label></div>
+                <select id="bot-potion-type" class="bf-sel" style="margin-bottom: 10px;">
+                    <option value="Mała Uzdrawiająca Mikstura">Mała Uzdrawiająca (od 1 lvl)</option>
+                    <option value="Średnia Uzdrawiająca Mikstura">Średnia Uzdrawiająca (od 3 lvl)</option>
+                    <option value="Zupa Życia">Zupa Życia (od 75 lvl)</option>
+                </select>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-potion-energy"> Pij Mikstury Energii (PA)</label></div>
+
+                <div class="bf-row-left" style="margin-top: 10px;"><label style="font-weight:bold; color:#ffcc33;">🛡️ Ucieczka (Zakończ Przygodę), gdy HP spadnie do:</label></div>
+                <select id="bot-safe-hp" class="bf-sel" style="margin-bottom: 10px;">
+                    <option value="0.15">15% (Wysokie ryzyko)</option>
+                    <option value="0.25">25% (Podwyższone ryzyko)</option>
+                    <option value="0.35">35% (Zbalansowane)</option>
+                    <option value="0.50">50% (Bezpieczne)</option>
+                    <option value="0.65">65% (Bardzo ostrożnie)</option>
+                </select>
+
+                <div class="bf-hr"></div>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-church"> Uzdrowienie w Kościele</label></div>
+                <div style="color: #aaa; font-size: 10px; margin-left: 24px;">Akceptuj max. koszt leczenia:</div>
+                <select id="bot-church-ap" class="bf-sel" style="margin-left: 24px; width: calc(100% - 24px); margin-bottom: 10px;">
+                    <option value="5">Do 5 Punktów Akcji (PA)</option>
+                    <option value="10">Do 10 Punktów Akcji (PA)</option>
+                    <option value="20">Do 20 Punktów Akcji (PA)</option>
+                    <option value="40">Do 40 Punktów Akcji (PA)</option>
+                    <option value="80">Do 80 Punktów Akcji (PA)</option>
+                </select>
+
+                <div class="bf-hr"></div>
+
+                <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-graveyard"> Praca (Cmentarz), gdy brak PA</label></div>
+                <select id="bot-graveyard-time" class="bf-sel" style="margin-left: 24px; width: calc(100% - 24px);">
+                    <option value="1">0:10:12 godz.</option>
+                    <option value="2">0:20:24 godz.</option>
+                    <option value="3">0:30:36 godz.</option>
+                    <option value="4">0:40:48 godz.</option>
+                    <option value="5">0:51:00 godz.</option>
+                    <option value="6">1:01:12 godz.</option>
+                    <option value="7">1:11:24 godz.</option>
+                    <option value="8">1:21:36 godz.</option>
+                </select>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+
+
+        function updateMainButtons(isRunning) {
+            if (isRunning) {
+                btnStart.style.background = '#006600';
+                btnStart.style.color = '#fff';
+                btnStart.style.boxShadow = '0 0 12px #00ff00';
+                btnStart.style.borderColor = '#00ff00';
+
+                btnStop.style.background = '#330000';
+                btnStop.style.color = '#888';
+                btnStop.style.boxShadow = 'none';
+                btnStop.style.borderColor = '#660000';
+            } else {
+                btnStart.style.background = '#003300';
+                btnStart.style.color = '#888';
+                btnStart.style.boxShadow = 'none';
+                btnStart.style.borderColor = '#006600';
+
+                btnStop.style.background = '#880000';
+                btnStop.style.color = '#fff';
+                btnStop.style.boxShadow = '0 0 12px #ff0000';
+                btnStop.style.borderColor = '#ff3333';
+            }
+        }
+
+        const isRunning = localStorage.getItem('botCfg_Main') === 'true';
+        updateMainButtons(isRunning);
+
+        btnStart.addEventListener('click', () => {
+            localStorage.setItem('botCfg_Main', 'true');
+            updateMainButtons(true);
+            window.location.reload();
+        });
+
+        btnStop.addEventListener('click', () => {
+            localStorage.setItem('botCfg_Main', 'false');
+            updateMainButtons(false);
+        });
+
+        function setupCheckbox(id, storageKey, defaultValue) {
+            const checkbox = document.getElementById(id);
+            const savedState = localStorage.getItem(storageKey);
+            checkbox.checked = savedState !== null ? savedState === 'true' : defaultValue;
+            checkbox.addEventListener('change', (e) => {
+                localStorage.setItem(storageKey, e.target.checked);
+            });
+        }
+
+        function setupSelect(id, storageKey) {
+            const select = document.getElementById(id);
+            const savedVal = localStorage.getItem(storageKey);
+            if (savedVal) select.value = savedVal;
+            select.addEventListener('change', (e) => {
+                localStorage.setItem(storageKey, e.target.value);
+            });
+        }
+
+
+        const rankContainer = document.getElementById('bot-rank-checkboxes');
+        const rankCbs = rankContainer.querySelectorAll('input[type="checkbox"]');
+        const savedRanks = localStorage.getItem('botCfg_HuntRanks');
+        const activeRanks = savedRanks ? savedRanks.split(',') : ['S','A','B','C','D','E','F'];
+
+        rankCbs.forEach(cb => {
+            cb.checked = activeRanks.includes(cb.value);
+            cb.addEventListener('change', () => {
+                const newActive = Array.from(rankCbs).filter(c => c.checked).map(c => c.value);
+                localStorage.setItem('botCfg_HuntRanks', newActive.join(','));
+            });
+        });
+
+        const ruinsContainer = document.getElementById('bot-ruins-checkboxes');
+        const ruinsCbs = ruinsContainer.querySelectorAll('input[type="checkbox"]');
+        const savedRuins = localStorage.getItem('botCfg_RuinsLevels');
+        const activeRuins = savedRuins ? savedRuins.split(',') : ['1','2','3'];
+
+        ruinsCbs.forEach(cb => {
+            cb.checked = activeRuins.includes(cb.value);
+            cb.addEventListener('change', () => {
+                const newActive = Array.from(ruinsCbs).filter(c => c.checked).map(c => c.value);
+                localStorage.setItem('botCfg_RuinsLevels', newActive.join(','));
+            });
+        });
+
+        setupCheckbox('bot-toggle-attributes', 'botCfg_Attributes', false);
+        const attrs = ['Siła', 'Obrona', 'Zwinność', 'Wytrzymałość', 'Charyzma'];
+        const savedAttrs = localStorage.getItem('botCfg_AttrList');
+        const activeAttrs = savedAttrs ? savedAttrs.split(',') : [];
+
+        attrs.forEach(attrName => {
+            let attrId = '';
+            if (attrName === 'Siła') attrId = 'attr-strength';
+            if (attrName === 'Obrona') attrId = 'attr-defense';
+            if (attrName === 'Zwinność') attrId = 'attr-agility';
+            if (attrName === 'Wytrzymałość') attrId = 'attr-endurance';
+            if (attrName === 'Charyzma') attrId = 'attr-charisma';
+
+            const cb = document.getElementById(attrId);
+            cb.checked = activeAttrs.includes(attrName);
+            cb.addEventListener('change', () => {
+                const currentActive = [];
+                if (document.getElementById('attr-strength').checked) currentActive.push('Siła');
+                if (document.getElementById('attr-defense').checked) currentActive.push('Obrona');
+                if (document.getElementById('attr-agility').checked) currentActive.push('Zwinność');
+                if (document.getElementById('attr-endurance').checked) currentActive.push('Wytrzymałość');
+                if (document.getElementById('attr-charisma').checked) currentActive.push('Charyzma');
+                localStorage.setItem('botCfg_AttrList', currentActive.join(','));
+            });
+        });
+
+        setupCheckbox('bot-potion-life', 'botCfg_PotionLife', true);
+        setupSelect('bot-potion-type', 'botCfg_PotionType');
+
+        setupCheckbox('bot-potion-energy', 'botCfg_PotionEnergy', true);
+        setupSelect('bot-safe-hp', 'botCfg_SafeHp');
+        setupCheckbox('bot-toggle-church', 'botCfg_Church', true);
+        setupSelect('bot-church-ap', 'botCfg_ChurchApMax');
+
+        setupCheckbox('bot-toggle-clan', 'botCfg_Clan', true);
+        setupCheckbox('bot-toggle-ruins', 'botCfg_Ruins', true);
+        setupCheckbox('bot-toggle-hunt', 'botCfg_Hunt', false);
+        setupSelect('bot-hunt-location', 'botCfg_HuntLocation');
+        setupCheckbox('bot-toggle-hunt-spheres-only', 'botCfg_HuntSpheresOnly', true);
+
+        setupCheckbox('bot-toggle-train', 'botCfg_Train', false);
+        setupSelect('bot-train-unit', 'botCfg_TrainUnit');
+
+        setupCheckbox('bot-toggle-adventure', 'botCfg_Adventure', true);
+        setupSelect('bot-adv-strategy', 'botCfg_AdvStrategy');
+
+        setupCheckbox('bot-toggle-grotte', 'botCfg_Grotte', false);
+        setupSelect('bot-grotte-diff', 'botCfg_GrotteDiff');
+
+        const cbAdv = document.getElementById('bot-toggle-adventure');
+        const cbGrotte = document.getElementById('bot-toggle-grotte');
+
+        cbAdv.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                cbGrotte.checked = false;
+                localStorage.setItem('botCfg_Grotte', 'false');
+            }
+        });
+
+        cbGrotte.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                cbAdv.checked = false;
+                localStorage.setItem('botCfg_Adventure', 'false');
+            }
+        });
+
+        setupCheckbox('bot-toggle-graveyard', 'botCfg_Graveyard', true);
+        setupSelect('bot-graveyard-time', 'botCfg_GraveyardTime');
+    }
+
+    function getRandomDelay() {
+        return Math.floor(Math.random() * (clickDelayMax - clickDelayMin + 1)) + clickDelayMin;
+    }
+
+    function goTo(url) {
+        setTimeout(() => window.location.href = url, getRandomDelay());
+    }
+
+    // Nasza nowa funkcja odświeżania po oczekiwaniu:
+    function waitAndRefresh(reason) {
+        console.log(`TEST: Wstrzymuję bota. Powód: ${reason}. Czekam 10 minut...`);
+        setTimeout(() => {
+            window.location.reload();
+        }, fallbackWaitTime);
+    }
+
+    function getStats() {
+        const goldDiv = document.querySelector("div.gold");
+        if (!goldDiv) return null;
+        const text = goldDiv.innerHTML;
+
+        const goldRegex = /([\d.]+)\s*(?:&nbsp;)?<img[^>]*alt="Złoto"/i;
+        const healthRegex = /([\d.]+)\s*(?:&nbsp;)?\/\s*(?:&nbsp;)?([\d.]+)\s*(?:&nbsp;)?<img[^>]*alt="Zdrowie"/i;
+        const apRegex = /([\d.]+)\s*(?:&nbsp;)?\/\s*(?:&nbsp;)?([\d.]+)\s*(?:&nbsp;)?<img[^>]*alt="Punkty Akcji"/i;
+        const bloodRegex = /<span[^>]*id="blood-essen-balance"[^>]*>\s*([\d.]+)\s*<\/span>/i;
+        const levelRegex = /alt="Poziom"[^>]*>\s*(?:&nbsp;)?(\d+)/i;
+
+        const goldMatch = text.match(goldRegex);
+        const healthMatch = text.match(healthRegex);
+        const apMatch = text.match(apRegex);
+        const bloodMatch = text.match(bloodRegex);
+        const levelMatch = text.match(levelRegex);
+
+        if (!goldMatch || !healthMatch || !apMatch) return null;
+
+        return {
+            gold: parseFloat(goldMatch[1].replace(/\./g, '')),
+            currentHP: parseFloat(healthMatch[1].replace(/\./g, '')),
+            maxHP: parseFloat(healthMatch[2].replace(/\./g, '')),
+            currentAP: parseInt(apMatch[1].replace(/\./g, ''), 10),
+            maxAP: parseInt(apMatch[2].replace(/\./g, ''), 10),
+            blood: bloodMatch ? parseInt(bloodMatch[1].replace(/\./g, ''), 10) : 0,
+            level: levelMatch ? parseInt(levelMatch[1], 10) : 1
+        };
+    }
+
+    function applyLevelRestrictionsToGUI(stats) {
+        const selectEl = document.getElementById('bot-potion-type');
+        if (selectEl && stats) {
+            Array.from(selectEl.options).forEach(opt => {
+                if (opt.value === 'Średnia Uzdrawiająca Mikstura') opt.disabled = stats.level < 3;
+                if (opt.value === 'Zupa Życia') opt.disabled = stats.level < 75;
+            });
+            if (selectEl.options[selectEl.selectedIndex].disabled) {
+                selectEl.value = 'Mała Uzdrawiająca Mikstura';
+                localStorage.setItem('botCfg_PotionType', 'Mała Uzdrawiająca Mikstura');
+            }
+        }
+    }
+
+  async function attemptAttributesUpgrade(currentPage, stats) {
+        const savedAttrs = (localStorage.getItem('botCfg_AttrList') || '').split(',').filter(Boolean);
+        if (savedAttrs.length === 0) return false;
+
+        if (!currentPage.includes('/profile/index')) {
+            console.log("TEST: Przechodzę na profil by ulepszyć atrybuty.");
+            goTo(profileLink); return true;
+        }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                // Pobieramy wiersze bezpośrednio z tabeli atrybutów (#skills_tab)
+                const attrRows = document.querySelectorAll("#skills_tab table tr");
+                let actionTaken = false;
+
+                for (let row of attrRows) {
+                    const labelTd = row.querySelector("td:first-child");
+                    if (!labelTd) continue;
+
+                    // Nazwa atrybutu, np. "Siła"
+                    const attrName = labelTd.textContent.replace(':', '').trim();
+
+                    // Jeśli ten atrybut nie jest zaznaczony w opcjach bota, pomijamy go
+                    if (!savedAttrs.includes(attrName)) continue;
+
+                    let cost = null;
+                    // Zgrywamy CAŁY tekst z wiersza (obejmuje oba ukryte tooltipy)
+                    const rowText = row.textContent;
+
+                    // Szukamy ceny w całym tekście wiersza
+                    const costMatch = rowText.match(/kosztuje:\s*([\d.]+)/i);
+
+                    if (costMatch) {
+                        // Usuwamy kropki z formatowania (np. 8.592.534 -> 8592534) i zamieniamy na liczbę
+                        cost = parseInt(costMatch[1].replace(/\./g, ''), 10);
+                        localStorage.setItem('bot_attrCost_' + attrName, cost.toString());
+                    }
+
+                    // Jeśli znamy koszt i bot nic jeszcze w tej pętli nie kliknął
+                    if (!actionTaken && cost !== null) {
+                        const plusBtnLink = row.querySelector("a[href*='/profile/training/']");
+
+                        // Sprawdzamy czy nas stać na ulepszenie
+                        if (plusBtnLink && stats.gold >= cost) {
+                            console.log(`TEST: Ulepszam '${attrName}' za ${cost} złota!`);
+                            setTimeout(() => plusBtnLink.click(), getRandomDelay());
+                            actionTaken = true;
+                        }
+                    }
+                }
+
+                if (actionTaken) {
+                    resolve(true);
+                } else {
+                    // Jeśli nas na nic nie stać, dajemy botowi 5 minut przerwy od sprawdzania statystyk
+                    localStorage.setItem('bot_NextAttrCheck', (Date.now() + 5 * 60 * 1000).toString());
+                    resolve(false);
+                }
+            }, profilePageLoadDelay); // Czekamy chwilę po wejściu na stronę by DOM zdążył się wyrenderować
+        });
+    }
+
+    async function attemptUseItem(currentPage, itemName, storageCooldown, storageNeedBuy) {
+        if (!currentPage.includes('/profile/index')) {
+            goTo(profileLink); return true;
+        }
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const itemRow = Array.from(document.querySelectorAll("#items #accordion table tr")).find(row =>
+                    row.querySelector("strong") && row.querySelector("strong").textContent.trim() === itemName
+                );
+
+                if (itemRow) {
+                    const useButton = itemRow.querySelector("a[href*='/profile/useItem/']");
+                    if (useButton) {
+                        console.log(`TEST: Używam '${itemName}'...`);
+                        localStorage.setItem(storageCooldown, (Date.now() + 60*60*1000).toString());
+                        setTimeout(() => useButton.click(), getRandomDelay());
+                        resolve(true);
+                    } else {
+                        let waitSeconds = 900;
+                        const cdElem = itemRow.querySelector('[data-remaining]');
+                        if (cdElem) {
+                            waitSeconds = parseInt(cdElem.getAttribute('data-remaining') || '900', 10);
+                        } else {
+                            const match = itemRow.textContent.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+                            if (match) waitSeconds = parseInt(match[1])*3600 + parseInt(match[2])*60 + parseInt(match[3]);
+                        }
+
+                        const readyTimestamp = Date.now() + (waitSeconds * 1000) + 5000;
+                        console.warn(`TEST: '${itemName}' ma cooldown. Zaplanowano powrót o: ${new Date(readyTimestamp).toLocaleTimeString()}`);
+                        localStorage.setItem(storageCooldown, readyTimestamp.toString());
+                        resolve(false);
+                    }
+                } else {
+                     console.warn(`TEST: Brak '${itemName}' w ekwipunku! Włączam moduł zakupów.`);
+                     localStorage.setItem(storageNeedBuy, 'true');
+                     resolve(false);
+                }
+            }, profilePageLoadDelay);
+        });
+    }
+
+    async function attemptBuyItem(currentPage, itemName, storageNeedBuy) {
+        if (!currentPage.includes(marketLink.replace("https://s70-pl.bitefight.gameforge.com", ""))) {
+            goTo(marketLink); return true;
+        }
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const elements = Array.from(document.querySelectorAll("strong, div")).filter(el => el.textContent.trim().includes(itemName));
+                if (elements.length > 0) {
+                    const itemContainer = elements[0].closest("tr") || elements[0].closest("div.item-form") || elements[0].parentElement.parentElement;
+                    if (itemContainer) {
+                        const buyButton = Array.from(itemContainer.querySelectorAll("a, button, input")).find(btn => (btn.textContent || btn.value || "").trim().includes("1x Kup") || (btn.textContent || btn.value || "").trim().includes("Kup"));
+                        if (buyButton) {
+                            setTimeout(() => {
+                                buyButton.click();
+                                setTimeout(() => {
+                                    const confirmButton = Array.from(document.querySelectorAll("a, button, input")).find(btn => (btn.textContent || btn.value || "").trim() === "Potwierdź");
+                                    if (confirmButton) {
+                                        localStorage.removeItem(storageNeedBuy);
+                                        setTimeout(() => confirmButton.click(), getRandomDelay());
+                                    } else localStorage.removeItem(storageNeedBuy);
+                                }, 1500);
+                            }, getRandomDelay());
+                            resolve(true); return;
+                        }
+                    }
+                }
+                console.error(`TEST: Brak możliwości zakupu ${itemName}.`);
+                localStorage.removeItem(storageNeedBuy); resolve(false);
+            }, profilePageLoadDelay);
+        });
+    }
+
+    async function attemptChurchHeal(currentPage) {
+        if (!currentPage.includes('/city/church')) { goTo(churchLink); return true; }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const churchContainer = document.getElementById('church');
+                if (!churchContainer) { resolve(false); return; }
+
+                const maxAp = parseInt(localStorage.getItem('botCfg_ChurchApMax') || '10', 10);
+                const apMatch = churchContainer.innerHTML.match(/(\d+)\s*(?:&nbsp;)?<img[^>]*alt="Punkty Akcji"/i);
+                const apCost = apMatch ? parseInt(apMatch[1], 10) : 0;
+                const textFound = Array.from(document.querySelectorAll("#church p")).some(p => p.textContent.includes("100% maksymalnego zdrowia"));
+
+                if (textFound) {
+                    if (apCost <= maxAp) {
+                        const healButton = document.querySelector("input.btn[value='Uzdrowienie']");
+                        if (healButton) {
+                            localStorage.setItem('lastChurchUse', Date.now().toString());
+                            setTimeout(() => healButton.click(), getRandomDelay());
+                            resolve(true); return;
+                        }
+                    } else {
+                        localStorage.setItem('lastChurchUse', (Date.now() + 15 * 60 * 1000).toString());
+                        resolve(false); return;
+                    }
+                }
+
+                localStorage.setItem('lastChurchUse', Date.now().toString());
+                resolve(false);
+            }, profilePageLoadDelay);
+        });
+    }
+
+    async function attemptClanWar(currentPage) {
+        if (!currentPage.includes('/clan/index')) { goTo(clanLink); return true; }
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const joinBtn = document.querySelector('input.join-now[type="submit"]');
+                if (joinBtn) {
+                    localStorage.setItem('nextClanWar', (Date.now() + clanWarCooldown).toString());
+                    setTimeout(() => joinBtn.click(), getRandomDelay());
+                    resolve(true); return;
+                } else {
+                    localStorage.setItem('nextClanWar', (Date.now() + clanWarCooldown).toString());
+                    goTo(adventureLink); resolve(true); return;
+                }
+            }, profilePageLoadDelay);
+        });
+    }
+
+    async function attemptRuins(currentPage, config) {
+        const isIndex = currentPage.includes('/ancestral/index');
+        const isShow = currentPage.includes('/ancestral/show');
+        const isFight = currentPage.includes('/ancestral/fight');
+
+        if (isFight) {
+            localStorage.setItem(`nextRuin_${config.id}`, (Date.now() + ruinsCooldown).toString());
+            localStorage.removeItem('activeRuinTarget');
+            goTo(adventureLink); return true;
+        }
+
+        if (isShow) {
+            return new Promise((resolve) => {
+                setTimeout(async () => {
+                    const startBtn = document.getElementById("fightBtn");
+                    if (startBtn) {
+                        const plusUnit1 = document.querySelector('button.btnPlus1[data-id="1"]');
+                        const plusUnit2 = document.querySelector('button.btnPlus1[data-id="2"]');
+                        const slider1 = document.getElementById("playerArmy1");
+                        const slider2 = document.getElementById("playerArmy2");
+
+                        if (plusUnit1 && plusUnit2 && slider1 && slider2) {
+                            const availableUnit1 = parseInt(slider1.max || '0', 10);
+                            const availableUnit2 = parseInt(slider2.max || '0', 10);
+                            if (availableUnit1 < config.unit1 || availableUnit2 < config.unit2) {
+                                console.warn(`TEST: BŁĄD! Zbyt mało wojska na Poziom ${config.id}!`);
+                                localStorage.setItem(`nextRuin_${config.id}`, (Date.now() + 30 * 60 * 1000).toString());
+                                localStorage.removeItem('activeRuinTarget');
+                                goTo(adventureLink); resolve(true); return;
+                            }
+
+                            for (let i = 0; i < config.unit1; i++) { plusUnit1.click(); await new Promise(r => setTimeout(r, 200)); }
+                            for (let i = 0; i < config.unit2; i++) { plusUnit2.click(); await new Promise(r => setTimeout(r, 200)); }
+
+                            localStorage.setItem(`nextRuin_${config.id}`, (Date.now() + ruinsCooldown).toString());
+                            setTimeout(() => startBtn.click(), getRandomDelay());
+                            resolve(true); return;
+                        } else {
+                            localStorage.setItem(`nextRuin_${config.id}`, (Date.now() + 5 * 60 * 1000).toString());
+                            localStorage.removeItem('activeRuinTarget'); resolve(false); return;
+                        }
+                    }
+                    resolve(false);
+                }, profilePageLoadDelay);
+            });
+        }
+
+        const targetUrl = `https://s70-pl.bitefight.gameforge.com/ancestral/index?page=1&layerId=${config.id}`;
+        if (!isIndex || !currentPage.includes(`layerId=${config.id}`)) { goTo(targetUrl); return true; }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const layerContainer = document.getElementById(`layerInfoContainer${config.id}`);
+                if (!layerContainer) { resolve(false); return; }
+
+                const text = layerContainer.textContent || "";
+                if (text.includes("WARUNKI ODBLOKOWANIA") || text.includes("Dostępne za")) {
+                    let waitMs = ruinsCooldown;
+                    const timeMatch = text.match(/Dost[ęe]pne za\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?/i);
+                    if (timeMatch) {
+                        const h = parseInt(timeMatch[1] || '0', 10); const m = parseInt(timeMatch[2] || '0', 10); const s = parseInt(timeMatch[3] || '0', 10);
+                        waitMs = (h * 3600 + m * 60 + s) * 1000 + 5000;
+                    }
+                    localStorage.setItem(`nextRuin_${config.id}`, (Date.now() + waitMs).toString());
+                    localStorage.removeItem('activeRuinTarget'); resolve(false); return;
+                }
+
+                const enterBtn = layerContainer.querySelector('a.layerEntryBtn');
+                if (enterBtn) { setTimeout(() => enterBtn.click(), getRandomDelay()); resolve(true); return; }
+
+                localStorage.setItem(`nextRuin_${config.id}`, (Date.now() + 5 * 60 * 1000).toString());
+                localStorage.removeItem('activeRuinTarget'); resolve(false);
+            }, profilePageLoadDelay);
+        });
+    }
+
+    async function attemptHunting(currentPage, stats) {
+        // Ważna zmiana - musimy zezwolić skryptowi na działanie po wejściu na stronę z wynikiem polowania
+        if (!currentPage.includes('/robbery/')) {
+            goTo(huntLink); return true;
+        }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                // ETAP 1: Ekstrakcja
+                const extractBtn = document.getElementById("extractBloodBtn");
+                const isExtractDisabled = extractBtn && (extractBtn.disabled || extractBtn.classList.contains('extractBloodDisabled'));
+
+                if (extractBtn && !isExtractDisabled) {
+                    const rankContainer = document.querySelector(".rank-container");
+                    let foundRank = null;
+                    if (rankContainer) {
+                        const match = rankContainer.textContent.match(/([SABCDEF])\s* - \s*Ranga/i);
+                        if (match) foundRank = match[1].toUpperCase();
+                    }
+
+                    const allowedRanks = (localStorage.getItem('botCfg_HuntRanks') || 'S,A,B,C,D,E,F').split(',');
+
+                    if (foundRank && allowedRanks.includes(foundRank)) {
+                        console.log(`TEST: 🔮 Znalazłem pożądaną Sferę Ekstrakcji (${foundRank} - Ranga). Pobieram!`);
+
+                        // Zwykłe kliknięcie w przycisk, które wywołuje grę (Ajax)
+                        extractBtn.click();
+
+                        // Zatwierdzanie ewentualnego okienka po ułamku sekundy
+                        setTimeout(() => {
+                            const confirmModalBtn = document.getElementById("confirmModal_buttonLeft");
+                            if (confirmModalBtn) {
+                                console.log("TEST: Zatwierdzam okienko w grze.");
+                                confirmModalBtn.click();
+                            }
+                        }, 800);
+
+                        // Skoro to był AJAX, musimy odświeżyć stronę na twardo, aby ujrzeć zmianę zegarów w slocie
+                        setTimeout(() => {
+                            window.location.href = huntLink;
+                        }, 2500);
+
+                        resolve(true);
+                        return;
+                    } else if (foundRank) {
+                        console.log(`TEST: 🔮 Znaleziona Sfera ma rangę ${foundRank} (wyłączona w opcjach).`);
+                    }
+                }
+
+                // ETAP 2: Zegary
+                const allSlots = document.querySelectorAll(".slots .slot");
+                let activeTimersCount = 0;
+                let minTimeSeconds = Infinity;
+
+                allSlots.forEach(slot => {
+                    const timerSpan = slot.querySelector('span[data-remaining]');
+                    if (timerSpan) {
+                        const rem = parseInt(timerSpan.getAttribute('data-remaining') || '0', 10);
+                        if (!isNaN(rem) && rem > 0) {
+                            activeTimersCount++;
+                            if (rem < minTimeSeconds) minTimeSeconds = rem;
+                        }
+                    }
+                });
+
+                const totalSlots = allSlots.length > 0 ? allSlots.length : 3;
+                const areAllSlotsBusy = activeTimersCount >= totalSlots;
+
+                if (areAllSlotsBusy && minTimeSeconds !== Infinity) {
+                    const readyTimestamp = Date.now() + (minTimeSeconds * 1000) + 5000;
+                    localStorage.setItem('nextSphereReady', readyTimestamp.toString());
+                } else if (!areAllSlotsBusy) {
+                    localStorage.setItem('nextSphereReady', '0');
+                }
+
+                const huntSpheresOnly = localStorage.getItem('botCfg_HuntSpheresOnly') === 'true';
+
+                // Uciekamy, jeśli wszystkie 3 miejsca pełne
+                if (areAllSlotsBusy && huntSpheresOnly) {
+                    console.log(`TEST: 🔮 Wszystkie sloty zapełnione. Przerwa na: ${Math.ceil(minTimeSeconds/60)} minut.`);
+                    resolve(false); return;
+                }
+
+                // ETAP 3: Kręcenie kołem
+                const huntLoc = localStorage.getItem('botCfg_HuntLocation') || '1';
+                const apCost = huntLoc === '5' ? 2 : 1;
+
+                if (stats.currentAP < apCost) {
+                    resolve(false); return;
+                }
+
+                // Sprawdzamy czy gra wygenerowała nam przycisk "Ponownie (-1 PA)" (KOŁO FORTUNY)
+                const ponownieBtn = Array.from(document.querySelectorAll("button[type='submit'].btn")).find(el => el.textContent.trim().toLowerCase().includes("ponownie"));
+                if (ponownieBtn) {
+                    console.log(`TEST: Wylosowano złą sferę. Kręcę kołem ponownie (koszt ${apCost} PA)!`);
+                    setTimeout(() => ponownieBtn.click(), getRandomDelay());
+                    resolve(true); return;
+                }
+
+                // Jeśli to nie okno z wynikiem, tylko strona główna polowań, idziemy w miasto!
+                const initBtn = document.querySelector(`button[onclick='doHunt(${huntLoc})']`);
+                if (initBtn) {
+                    console.log(`TEST: Rozpoczynam pierwsze Polowanie w wybranej lokacji!`);
+                    setTimeout(() => initBtn.click(), getRandomDelay());
+                    resolve(true); return;
+                }
+
+                goTo(huntLink);
+                resolve(true);
+
+            }, profilePageLoadDelay);
+        });
+    }
+
+   async function attemptTraining(currentPage, stats) {
+        const unitId = localStorage.getItem('botCfg_TrainUnit') || '1';
+        const costPerUnit = unitCosts[unitId] || 10;
+
+        // Jeśli nie stać nas nawet na 1 sztukę, przerywamy
+        if (stats.blood < costPerUnit) return false;
+
+        // Jeśli nie jesteśmy na stronie Jamy Lęgowej, idziemy tam
+        if (!currentPage.includes('/nourishing/index')) {
+            goTo(trainLink); return true;
+        }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                // Jeśli stać nas na 10 sztuk, próbujemy kliknąć przycisk dla 10.
+                // W przeciwnym razie klikamy przycisk dla 1 sztuki.
+                const amountToBuy = (stats.blood >= costPerUnit * 10) ? 10 : 1;
+
+                // Generujemy ID przycisku na podstawie wyboru jednostki i obliczonej ilości
+                const btnId = `recruits-${unitId}-${amountToBuy}`;
+                const trainBtn = document.getElementById(btnId);
+
+                // Sprawdzamy, czy przycisk istnieje i czy nie jest zablokowany (np. przez odliczanie/kolejkę)
+                if (trainBtn && !trainBtn.classList.contains('disabled')) {
+                    console.log(`TEST: Kupuję ${amountToBuy} szt. wojska (ID: ${unitId}).`);
+
+                    setTimeout(() => {
+                        trainBtn.click();
+
+                        // Dodajemy wymuszone odświeżenie po 1.5 sekundy
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+
+                    }, getRandomDelay());
+
+                    resolve(true);
+                    return;
+                } else {
+                    // Zabezpieczenie: jeśli przyciski są zablokowane (np. pełna kolejka szkolenia), wracamy do przygód
+                    console.log("TEST: Kolejka pełna lub przycisk zablokowany. Wracam do przygód.");
+                    goTo(adventureLink);
+                    resolve(true);
+                    return;
+                }
+            }, profilePageLoadDelay);
+        });
+    }
+
+    async function attemptGraveyard(currentPage) {
+        if (!currentPage.includes('/city/graveyard')) {
+            goTo(graveyardLink); return true;
+        }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const workSelect = document.querySelector('select[name="workDuration"]');
+                if (!workSelect) {
+                    resolve(true); return;
+                }
+
+                const workTimeValue = localStorage.getItem('botCfg_GraveyardTime') || '1';
+                workSelect.value = workTimeValue;
+                const submitBtn = document.querySelector('input[name="dowork"]');
+                if (submitBtn) {
+                    setTimeout(() => submitBtn.click(), getRandomDelay());
+                    resolve(true); return;
+                }
+                resolve(false);
+            }, profilePageLoadDelay);
+        });
+    }
+
+    function findAndClickChoice(wantsToExit) {
+        const strategyKey = localStorage.getItem('botCfg_AdvStrategy') || 'exp_gold';
+        const activeStrategy = adventureStrategies[strategyKey] || adventureStrategies['exp_gold'];
+        const choicePriority = activeStrategy.priority;
+        const avoidChoices = activeStrategy.avoid;
+
+        const allChoiceElements = document.querySelectorAll("a.btn[href*='/city/adventure/decision/']");
+        if (allChoiceElements.length === 0) return;
+
+        if (wantsToExit) {
+            const przyciskZakoncz = Array.from(allChoiceElements).find(el => el.textContent.trim().toLowerCase() === 'zakończ przygodę');
+            if (przyciskZakoncz) {
+                przyciskZakoncz.style.border = '3px solid red';
+                setTimeout(() => przyciskZakoncz.click(), getRandomDelay());
+                return;
+            }
+        }
+
+        const availableChoices = new Map();
+        const availableChoiceTexts = [];
+        allChoiceElements.forEach(el => {
+            const text = el.textContent.trim();
+            if (text) { availableChoices.set(text, el); availableChoiceTexts.push(text); }
+        });
+
+        for (const preferredText of choicePriority) {
+            const matchingChoice = availableChoiceTexts.find(t => t.toLowerCase() === preferredText.toLowerCase());
+            if (matchingChoice) {
+                const elementToClick = availableChoices.get(matchingChoice);
+                elementToClick.style.border = '3px solid gold';
+                setTimeout(() => elementToClick.click(), getRandomDelay());
+                return;
+            }
+        }
+
+        for (const text of availableChoiceTexts) {
+            const isAvoided = avoidChoices.some(avoidText => text.toLowerCase() === avoidText.toLowerCase());
+            if (!isAvoided) {
+                const elementToClick = availableChoices.get(text);
+                elementToClick.style.border = '3px solid white';
+                setTimeout(() => elementToClick.click(), getRandomDelay());
+                return;
+            }
+        }
+
+        const forcedElement = allChoiceElements[0];
+        forcedElement.style.border = '3px solid red';
+        setTimeout(() => forcedElement.click(), getRandomDelay());
+    }
+
+    async function attemptGrotte(currentPage, wantsToExit) {
+        const isOnGrottePage = currentPage.includes('/city/grotte');
+
+        const btnKontynuuj = Array.from(document.querySelectorAll("a.btn")).find(el => el.textContent.trim().toLowerCase().includes('kontynuuj'));
+
+        if (btnKontynuuj) {
+            btnKontynuuj.style.border = '3px solid magenta';
+            setTimeout(() => btnKontynuuj.click(), getRandomDelay());
+            return true;
+        }
+
+        if (wantsToExit) {
+            goTo(profileLink);
+            return true;
+        }
+
+        if (!isOnGrottePage) {
+            goTo(grotteLink);
+            return true;
+        }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const diff = localStorage.getItem('botCfg_GrotteDiff') || 'Łatwe';
+                const attackBtn = document.querySelector(`input[type="submit"][name="difficulty"][value="${diff}"]`);
+
+                if (attackBtn) {
+                    console.log(`TEST: Atakuję Grotę (Trudność: ${diff})`);
+                    attackBtn.style.border = '3px solid gold';
+                    setTimeout(() => attackBtn.click(), getRandomDelay());
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+            }, profilePageLoadDelay);
+        });
+    }
+
+    function runAdventureLogic(currentPage, wantsToExit) {
+        const przyciskTawerna = document.querySelector("button[onclick=\"document.location.href='/city/adventure'\"]");
+        const przyciskStartQuest = document.querySelector("a.btn[href='/city/adventure/startquest']");
+
+        const btnList = Array.from(document.querySelectorAll("a.btn"));
+        const przyciskKontynuuj = btnList.find(el => el.textContent.trim().toLowerCase().includes('kontynuuj'));
+        const przyciskZakoncz = btnList.find(el => el.textContent.trim().toLowerCase() === 'zakończ przygodę');
+
+        const przyciskKontynuujPosredni = document.querySelector("a.btn[href='/city/adventure/']");
+        const przyciskDecyzji = document.querySelector("a.btn[href*='/city/adventure/decision/']");
+
+        const isOnAdventurePage = currentPage.includes('/city/adventure');
+
+        // 1. EKRAN PODSUMOWANIA: Tutaj kulturalnie kończymy przygodę i wychodzimy z lasu
+        if (wantsToExit && przyciskKontynuuj && przyciskZakoncz) {
+            console.log("TEST: Misja w lesie ukończona. Wychodzę z lasu do Groty!");
+            przyciskZakoncz.style.border = '3px solid red';
+            setTimeout(() => przyciskZakoncz.click(), getRandomDelay());
+            return;
+        }
+
+        // 2. EKRAN STARTOWY: Jeśli chcemy wyjść (np. do Groty), a nie ma misji w toku, nie klikamy Startu!
+        if (wantsToExit && (przyciskTawerna || przyciskStartQuest)) {
+            console.log("TEST: Pusty las. Nie zaczynam nowej misji, idę robić coś innego.");
+            return; // Bot wychodzi z tej funkcji, a główny router (mainLogic) odpali np. Grotę
+        }
+
+        // 3. W TRAKCIE MISJI: Normalny przepływ (gramy aż do pojawienia się ekranu podsumowania)
+        if (przyciskTawerna) {
+            przyciskTawerna.style.border = '3px solid limegreen'; setTimeout(() => przyciskTawerna.click(), getRandomDelay());
+        } else if (przyciskStartQuest) {
+            przyciskStartQuest.style.border = '3px solid cyan'; setTimeout(() => przyciskStartQuest.click(), getRandomDelay());
+        } else if (przyciskKontynuuj) {
+            przyciskKontynuuj.style.border = '3px solid magenta'; setTimeout(() => przyciskKontynuuj.click(), getRandomDelay());
+        } else if (przyciskKontynuujPosredni) {
+            przyciskKontynuujPosredni.style.border = '3px solid orange'; setTimeout(() => przyciskKontynuujPosredni.click(), getRandomDelay());
+        } else if (przyciskDecyzji) {
+            // Podajemy twarde "false", aby bot ignorował polecenie ucieczki W TRAKCIE FABUŁY i dokończył zadanie
+            findAndClickChoice(false);
+        } else if (!isOnAdventurePage) {
+            goTo(adventureLink);
+        } else {
+            goTo(adventureLink);
+        }
+    }
+
+    /**
+     * GŁÓWNY ROUTER LOGIKI
+     */
+    async function mainLogic() {
+        createBotPanel();
+
+        const isBotRunning = localStorage.getItem('botCfg_Main') === 'true';
+        if (!isBotRunning) return;
+
+        const stats = getStats();
+        if (!stats) return;
+
+        applyLevelRestrictionsToGUI(stats);
+
+        const doPotionLife = localStorage.getItem('botCfg_PotionLife') !== 'false';
+        const doPotionEnergy = localStorage.getItem('botCfg_PotionEnergy') !== 'false';
+        const chosenLifePotion = localStorage.getItem('botCfg_PotionType') || 'Mała Uzdrawiająca Mikstura';
+
+        const doChurch = localStorage.getItem('botCfg_Church') !== 'false';
+        const doClan = localStorage.getItem('botCfg_Clan') !== 'false';
+        const doRuins = localStorage.getItem('botCfg_Ruins') !== 'false';
+        const doHunt = localStorage.getItem('botCfg_Hunt') === 'true';
+        const doTrain = localStorage.getItem('botCfg_Train') === 'true';
+        const doAttributes = localStorage.getItem('botCfg_Attributes') === 'true';
+        const doAdventure = localStorage.getItem('botCfg_Adventure') !== 'false';
+        const doGrotte = localStorage.getItem('botCfg_Grotte') === 'true';
+        const doGraveyard = localStorage.getItem('botCfg_Graveyard') !== 'false';
+        // Pobieramy wartość z panelu bota, domyślnie ustawiając 0.50 (50%)
+        const healthSafePercent = parseFloat(localStorage.getItem('botCfg_SafeHp') || '0.50');
+
+        const currentPage = window.location.href;
+        if (!currentPage.includes('.gameforge.com/')) return;
+
+        const isChurchOnCooldown = (Date.now() - parseInt(localStorage.getItem('lastChurchUse') || '0', 10) < churchScriptCooldown);
+
+        const onAdventurePage = currentPage.includes('/city/adventure');
+        const hasStartQuestBtn = document.querySelector("a.btn[href='/city/adventure/startquest']") !== null;
+        const hasTavernBtn = document.querySelector("button[onclick=\"document.location.href='/city/adventure'\"]") !== null;
+        const isBusyInAdventure = onAdventurePage && !hasStartQuestBtn && !hasTavernBtn;
+
+        // PRIORYTET 0: ZAKUPY MIKSTUR
+        if (doPotionLife && localStorage.getItem('needsLifePotion') === 'true' && !isBusyInAdventure) {
+            const isBuying = await attemptBuyItem(currentPage, chosenLifePotion, 'needsLifePotion');
+            if (isBuying) return;
+        }
+        if (doPotionEnergy && localStorage.getItem('needsEnergyPotion') === 'true' && !isBusyInAdventure) {
+            const isBuying = await attemptBuyItem(currentPage, potionEnergyName, 'needsEnergyPotion');
+            if (isBuying) return;
+        }
+
+        // PRIORYTET 1: ZDROWIE KRYTYCZNE
+        if ((doPotionLife || doChurch) && stats.currentHP < (stats.maxHP * healthCriticalPercent)) {
+            let healAction = false;
+            const nextLife = parseInt(localStorage.getItem('nextLifePotionReady') || '0', 10);
+
+            if (doPotionLife && Date.now() > nextLife) {
+                healAction = await attemptUseItem(currentPage, chosenLifePotion, 'nextLifePotionReady', 'needsLifePotion');
+            }
+            if (doChurch && !healAction && !isChurchOnCooldown) {
+                healAction = await attemptChurchHeal(currentPage);
+            }
+            if (!healAction) waitAndRefresh("Krytyczne HP, wybrane metody niedostępne (cooldown)");
+            return;
+        }
+
+        // PRIORYTET 2: ZDROWIE NISKIE
+        if (doPotionLife && stats.currentHP < (stats.maxHP * healthTriggerPercent)) {
+            const nextLife = parseInt(localStorage.getItem('nextLifePotionReady') || '0', 10);
+            if (Date.now() > nextLife && !isBusyInAdventure) {
+                const potionSuccess = await attemptUseItem(currentPage, chosenLifePotion, 'nextLifePotionReady', 'needsLifePotion');
+                if (potionSuccess) return;
+            }
+        }
+
+        // PRIORYTET 2.1: ODNOWA ENERGII (-10 PA od MAKSA)
+        if (doPotionEnergy && stats.currentAP <= (stats.maxAP - 10) && !isBusyInAdventure) {
+            const nextEnergy = parseInt(localStorage.getItem('nextEnergyPotionReady') || '0', 10);
+            if (Date.now() > nextEnergy) {
+                const actionTaken = await attemptUseItem(currentPage, potionEnergyName, 'nextEnergyPotionReady', 'needsEnergyPotion');
+                if (actionTaken) return;
+            }
+        }
+
+        // PRIORYTET 2.2: WOJNA KLANOWA
+        if (doClan && !isBusyInAdventure) {
+            const clanMenuLink = document.querySelector("a[href*='/clan/index']");
+            if (clanMenuLink && clanMenuLink.classList.contains('newmessage')) {
+                const nextClanWar = parseInt(localStorage.getItem('nextClanWar') || '0', 10);
+                if (Date.now() > nextClanWar) {
+                    const isDoingClan = await attemptClanWar(currentPage);
+                    if (isDoingClan) return;
+                }
+            }
+        }
+
+        // =========================================================================
+        // GLOBALNE ZARZĄDZANIE: CZY TRZEBA WYJŚĆ Z LASU?
+        // =========================================================================
+        let wantsToExit = false;
+
+        let wantsToRuin = false;
+        const activeRuinsLevels = (localStorage.getItem('botCfg_RuinsLevels') || '1,2,3').split(',').map(Number);
+        const activeRuinsConfig = ruinsLevels.filter(r => activeRuinsLevels.includes(r.id));
+
+        if (doRuins) {
+            const activeTargetId = localStorage.getItem('activeRuinTarget');
+            if (activeTargetId && activeRuinsLevels.includes(Number(activeTargetId))) {
+                wantsToRuin = true;
+            } else {
+                for (const ruin of activeRuinsConfig) {
+                    if (Date.now() > parseInt(localStorage.getItem(`nextRuin_${ruin.id}`) || '0', 10)) {
+                        wantsToRuin = true; break;
+                    }
+                }
+            }
+        }
+
+        let wantsToHunt = false;
+        const huntLoc = localStorage.getItem('botCfg_HuntLocation') || '1';
+        const apCost = huntLoc === '5' ? 2 : 1;
+        const huntSpheresOnly = localStorage.getItem('botCfg_HuntSpheresOnly') === 'true';
+        const nextSphereTime = parseInt(localStorage.getItem('nextSphereReady') || '0', 10);
+
+        if (doHunt && stats.currentAP >= apCost) {
+            if (!huntSpheresOnly || Date.now() >= nextSphereTime) wantsToHunt = true;
+        }
+
+       let wantsToTrain = false;
+        if (doTrain) {
+            const unitId = localStorage.getItem('botCfg_TrainUnit') || '1';
+            const costPerUnit = unitCosts[unitId] || 10;
+            // Zmieniliśmy warunek: bot chce trenować, jeśli stać go na minimum 1 sztukę
+            if (stats.blood >= costPerUnit) wantsToTrain = true;
+        }
+
+        let wantsToUpgrade = false;
+        if (doAttributes) {
+            const nextAttrCheck = parseInt(localStorage.getItem('bot_NextAttrCheck') || '0', 10);
+            const activeAttrs = (localStorage.getItem('botCfg_AttrList') || '').split(',').filter(Boolean);
+
+            console.log(`TEST Atrybutów: Moduł włączony. Zaznaczone statystyki: ${activeAttrs.length > 0 ? activeAttrs.join(', ') : 'BRAK!'}`);
+
+            if (Date.now() > nextAttrCheck) {
+                for (const attr of activeAttrs) {
+                    const savedCost = localStorage.getItem('bot_attrCost_' + attr);
+
+                    if (!savedCost || isNaN(savedCost)) {
+                        console.log(`TEST Atrybutów: Brak poprawnej ceny dla '${attr}'. Muszę iść na profil ją sprawdzić!`);
+                        wantsToUpgrade = true;
+                        break;
+                    } else if (stats.gold >= parseInt(savedCost, 10)) {
+                        console.log(`TEST Atrybutów: Stać mnie na '${attr}'! (Koszt: ${savedCost}, Moje złoto: ${stats.gold}). Idę na profil!`);
+                        wantsToUpgrade = true;
+                        break;
+                    } else {
+                        console.log(`TEST Atrybutów: Za mało złota na '${attr}'. Koszt: ${savedCost}, Złoto: ${stats.gold}`);
+                    }
+                }
+            } else {
+                console.log(`TEST Atrybutów: Bot odpoczywa po ostatnim sprawdzeniu. Koniec przerwy za: ${Math.round((nextAttrCheck - Date.now()) / 1000)} sekund.`);
+            }
+        }
+
+        let wantsToWork = false;
+        if (doGraveyard && stats.currentAP < 3 && !wantsToHunt) {
+            const nextEnergy = parseInt(localStorage.getItem('nextEnergyPotionReady') || '0', 10);
+            if (!doPotionEnergy || Date.now() < nextEnergy) wantsToWork = true;
+        }
+
+        if (doAdventure && stats.currentAP < 3) wantsToExit = true;
+        if (doGrotte && stats.currentAP < 1) wantsToExit = true;
+        if (!doAdventure && !doGrotte && stats.currentAP < 1) wantsToExit = true;
+
+        if (typeof healthSafePercent !== 'undefined' && stats.currentHP < (stats.maxHP * healthSafePercent)) wantsToExit = true;
+        if (wantsToRuin || wantsToHunt || wantsToTrain || wantsToWork) wantsToExit = true;
+
+        // =========================================================================
+        // REALIZACJA MODUŁÓW
+        // =========================================================================
+
+        // Bot pójdzie na profil kupić atrybut, nawet jeśli jest w środku lasu!
+        if (wantsToUpgrade) {
+            const isUpgrading = await attemptAttributesUpgrade(currentPage, stats);
+            if (isUpgrading) return;
+        }
+
+        if (wantsToRuin && !isBusyInAdventure) {
+            const activeTargetId = localStorage.getItem('activeRuinTarget');
+            if (activeTargetId && (currentPage.includes('/ancestral/show') || currentPage.includes('/ancestral/fight'))) {
+                const activeRuin = activeRuinsConfig.find(r => r.id == activeTargetId);
+                if (activeRuin) {
+                    const isDoingRuins = await attemptRuins(currentPage, activeRuin);
+                    if (isDoingRuins) return;
+                }
+            }
+            for (const ruin of activeRuinsConfig) {
+                if (Date.now() > parseInt(localStorage.getItem(`nextRuin_${ruin.id}`) || '0', 10)) {
+                    localStorage.setItem('activeRuinTarget', ruin.id.toString());
+                    const isDoingRuins = await attemptRuins(currentPage, ruin);
+                    if (isDoingRuins) return;
+                }
+            }
+            if (activeTargetId && !currentPage.includes('/ancestral/')) localStorage.removeItem('activeRuinTarget');
+        }
+
+        if (wantsToHunt && !isBusyInAdventure) {
+            const isHunting = await attemptHunting(currentPage, stats);
+            if (isHunting) return;
+        }
+
+        if (wantsToTrain && !isBusyInAdventure) {
+            const isTraining = await attemptTraining(currentPage, stats);
+            if (isTraining) return;
+        }
+
+        if (wantsToWork && !isBusyInAdventure) {
+            const isWorking = await attemptGraveyard(currentPage);
+            if (isWorking) return;
+        }
+
+        // =========================================================================
+        // ZABEZPIECZENIE PRZED ŚMIERCIĄ
+        // =========================================================================
+        if (stats.currentHP < (stats.maxHP * healthSafePercent) && !isBusyInAdventure) {
+            waitAndRefresh("Zdrowie poniżej bezpiecznego progu (50%). Czekam na regenerację");
+            return;
+        }
+
+        // PRIORYTET 3: PRZYGODA W LESIE (lub kulturalne wyjście z niej)
+        // Jeśli jesteśmy w trakcie przygody, MUSIMY ją najpierw zakończyć, nawet jeśli opcja Przygód została odznaczona.
+        if (isBusyInAdventure || (doAdventure && stats.currentAP >= 3)) {
+
+            // Jeśli gracz odznaczył Przygody (bo włączył Grotę), zmuszamy bota do kliknięcia "Zakończ przygodę"
+            const forceExit = wantsToExit || !doAdventure;
+
+            runAdventureLogic(currentPage, forceExit);
+            return;
+        }
+
+        // PRIORYTET 4: GROTA
+        if (doGrotte && (stats.currentAP >= 1 || currentPage.includes('/city/grotte'))) {
+            const isDoingGrotte = await attemptGrotte(currentPage, wantsToExit);
+            if (isDoingGrotte) return;
+        }
+
+    }
+
+    setTimeout(mainLogic, 500);
+
+})();
