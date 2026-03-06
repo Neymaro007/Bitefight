@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         BiteFight s70 Bot Pro v24.0
+// @name         BiteFight Bot Pro v24.0
 // @namespace    http://tampermonkey.net/
 // @version      24.0
 // @description  Ostateczna naprawa koła fortuny i ekstrakcji (zostawanie na stronie wyniku, odświeżanie po AJAX).
-// @author       Shakira
-// @match        https://s70-pl.bitefight.gameforge.com/*
+// @author       Anonymous
+// @match        https://*.bitefight.gameforge.com/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -16,9 +16,6 @@
     // 📜 KONFIGURACJA 📜
     //==================================================================
 
-    const clickDelayMin = 200;
-    const clickDelayMax = 800;
-
     const healthTriggerPercent = 0.85;
     const healthCriticalPercent = 0.15;
 
@@ -27,15 +24,18 @@
     const fallbackWaitTime = 10 * 60 * 1000;
     const profilePageLoadDelay = 1000;
 
-    const adventureLink = "https://s70-pl.bitefight.gameforge.com/city/adventure";
-    const profileLink = "https://s70-pl.bitefight.gameforge.com/profile/index";
-    const churchLink = "https://s70-pl.bitefight.gameforge.com/city/church";
-    const marketLink = "https://s70-pl.bitefight.gameforge.com/city/shop/potions/";
-    const clanLink = "https://s70-pl.bitefight.gameforge.com/clan/index";
-    const huntLink = "https://s70-pl.bitefight.gameforge.com/robbery/index";
-    const graveyardLink = "https://s70-pl.bitefight.gameforge.com/city/graveyard";
-    const trainLink = "https://s70-pl.bitefight.gameforge.com/nourishing/index";
-    const grotteLink = "https://s70-pl.bitefight.gameforge.com/city/grotte";
+    // Dynamicznie pobieramy serwer (np. https://s69-pl.bitefight.gameforge.com)
+    const baseURL = window.location.origin;
+
+    const adventureLink = baseURL + "/city/adventure";
+    const profileLink = baseURL + "/profile/index";
+    const churchLink = baseURL + "/city/church";
+    const marketLink = baseURL + "/city/shop/potions/";
+    const clanLink = baseURL + "/clan/index";
+    const huntLink = baseURL + "/robbery/index";
+    const graveyardLink = baseURL + "/city/graveyard";
+    const trainLink = baseURL + "/nourishing/index";
+    const grotteLink = baseURL + "/city/grotte";
 
     const potionEnergyName = "Mikstura Energii";
 
@@ -109,6 +109,41 @@
     function createBotPanel() {
         if (document.getElementById('bf-bot-panel')) return;
 
+        // Wykrywamy serwer na podstawie adresu URL
+        const currentServerMatch = window.location.host.match(/s(\d+)-pl/);
+        const currentServerId = currentServerMatch ? currentServerMatch[1] : '70';
+
+        // Definiujemy, które serwery mają prędkość x2
+        const x2Servers = ['60', '63', '65', '67', '69'];
+        const isX2 = x2Servers.includes(currentServerId);
+
+        // Generujemy odpowiednią tabelkę czasu
+        let graveyardOptions = '';
+        if (isX2) {
+            graveyardOptions = `
+                <option value="1">0:30:00 godz. </option>
+                <option value="2">1:00:00 godz. </option>
+                <option value="3">1:30:00 godz. </option>
+                <option value="4">2:00:00 godz. </option>
+                <option value="5">2:30:00 godz. </option>
+                <option value="6">3:00:00 godz. </option>
+                <option value="7">3:30:00 godz. </option>
+                <option value="8">4:00:00 godz. </option>
+            `;
+        } else {
+            // Domyślnie używamy prędkości x6 dla pozostałych (61, 62, 64, 66, 68, 70)
+            graveyardOptions = `
+                <option value="1">0:10:12 godz. </option>
+                <option value="2">0:20:24 godz. </option>
+                <option value="3">0:30:36 godz. </option>
+                <option value="4">0:40:48 godz. </option>
+                <option value="5">0:51:00 godz. </option>
+                <option value="6">1:01:12 godz. </option>
+                <option value="7">1:11:24 godz. </option>
+                <option value="8">1:21:36 godz. </option>
+            `;
+        }
+
         const panel = document.createElement('div');
         panel.id = 'bf-bot-panel';
         panel.style.cssText = `
@@ -145,7 +180,34 @@
                 #bf-bot-panel::-webkit-scrollbar-thumb:hover { background: #a00000; }
             </style>
 
-            <h3 style="margin: 0 0 15px 0; text-align: center; color: #ff3333; text-transform: uppercase; letter-spacing: 2px; font-size: 15px; text-shadow: 2px 2px 4px black, 0 0 10px rgba(255,0,0,0.5);">BiteFight Bot v24.0</h3>
+           <h3 style="margin: 0 0 5px 0; text-align: center; color: #ff3333; text-transform: uppercase; letter-spacing: 2px; font-size: 15px; text-shadow: 2px 2px 4px black, 0 0 10px rgba(255,0,0,0.5);">BiteFight Bot v24.0</h3>
+
+            <div style="text-align: center; margin-bottom: 12px;">
+                <label style="color:#aaa; font-size: 11px;">🌍 Serwer:</label>
+                <select id="bot-server-select" class="bf-sel" style="width: auto; display: inline-block; margin-left: 5px; padding: 2px 5px; margin-right: 10px;">
+                    <option value="60">s60</option>
+                    <option value="61">s61</option>
+                    <option value="62">s62</option>
+                    <option value="63">s63</option>
+                    <option value="64">s64</option>
+                    <option value="65">s65</option>
+                    <option value="66">s66</option>
+                    <option value="67">s67</option>
+                    <option value="68">s68</option>
+                    <option value="69">s69</option>
+                    <option value="70">s70</option>
+                </select>
+
+                <div style="margin-top: 6px;">
+                    <label style="color:#aaa; font-size: 11px;">⏱️ Prędkość bota:</label>
+                    <select id="bot-click-delay" class="bf-sel" style="width: auto; display: inline-block; margin-left: 5px; padding: 2px 5px;">
+                        <option value="fast">Szybka (100 - 400 ms)</option>
+                        <option value="normal" selected>Normalna (200 - 800 ms)</option>
+                        <option value="human">Ludzka (0.5s - 1.5s)</option>
+                        <option value="safe">Bezpieczna (1s - 3s)</option>
+                    </select>
+                </div>
+            </div>
 
             <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                 <button id="btn-start" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; border: 1px solid #00aa00; background: linear-gradient(180deg, #004400, #002200); color: #fff; cursor: pointer; border-radius: 5px; transition: 0.3s; text-shadow: 1px 1px 2px black;">▶ START</button>
@@ -283,14 +345,7 @@
 
                 <div class="bf-row-left"><label style="font-weight:bold; color:#fff;"><input type="checkbox" id="bot-toggle-graveyard"> Praca (Cmentarz), gdy brak PA</label></div>
                 <select id="bot-graveyard-time" class="bf-sel" style="margin-left: 24px; width: calc(100% - 24px);">
-                    <option value="1">0:10:12 godz.</option>
-                    <option value="2">0:20:24 godz.</option>
-                    <option value="3">0:30:36 godz.</option>
-                    <option value="4">0:40:48 godz.</option>
-                    <option value="5">0:51:00 godz.</option>
-                    <option value="6">1:01:12 godz.</option>
-                    <option value="7">1:11:24 godz.</option>
-                    <option value="8">1:21:36 godz.</option>
+                    ${graveyardOptions}
                 </select>
             </div>
         `;
@@ -299,6 +354,18 @@
 
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
+
+        // Wykrywanie aktualnego serwera i ustawianie go w liście rozwijanej
+        const serverSelect = document.getElementById('bot-server-select');
+        if (currentServerMatch) {
+            serverSelect.value = currentServerMatch[1];
+        }
+
+        // Akcja po wybraniu innego serwera - przeniesienie gracza
+        serverSelect.addEventListener('change', (e) => {
+            const newServer = e.target.value;
+            window.location.href = `https://s${newServer}-pl.bitefight.gameforge.com/profile/index`;
+        });
 
 
         function updateMainButtons(isRunning) {
@@ -339,10 +406,18 @@
             updateMainButtons(false);
         });
 
-        function setupCheckbox(id, storageKey, defaultValue) {
+       function setupCheckbox(id, storageKey, defaultValue) {
             const checkbox = document.getElementById(id);
-            const savedState = localStorage.getItem(storageKey);
-            checkbox.checked = savedState !== null ? savedState === 'true' : defaultValue;
+            let savedState = localStorage.getItem(storageKey);
+
+            // Jeśli to nowy serwer i brakuje zapisu w pamięci, wymuszamy zapis domyślnej wartości
+            if (savedState === null) {
+                localStorage.setItem(storageKey, defaultValue);
+                savedState = defaultValue.toString();
+            }
+
+            checkbox.checked = savedState === 'true';
+
             checkbox.addEventListener('change', (e) => {
                 localStorage.setItem(storageKey, e.target.checked);
             });
@@ -351,7 +426,14 @@
         function setupSelect(id, storageKey) {
             const select = document.getElementById(id);
             const savedVal = localStorage.getItem(storageKey);
-            if (savedVal) select.value = savedVal;
+
+            if (savedVal) {
+                select.value = savedVal;
+            } else {
+                // Jeśli brak zapisu, zabezpieczamy pamięć aktualną wartością widoczną w menu
+                localStorage.setItem(storageKey, select.value);
+            }
+
             select.addEventListener('change', (e) => {
                 localStorage.setItem(storageKey, e.target.value);
             });
@@ -430,6 +512,8 @@
         setupCheckbox('bot-toggle-adventure', 'botCfg_Adventure', true);
         setupSelect('bot-adv-strategy', 'botCfg_AdvStrategy');
 
+        setupSelect('bot-click-delay', 'botCfg_ClickDelay');
+
         setupCheckbox('bot-toggle-grotte', 'botCfg_Grotte', false);
         setupSelect('bot-grotte-diff', 'botCfg_GrotteDiff');
 
@@ -454,8 +538,16 @@
         setupSelect('bot-graveyard-time', 'botCfg_GraveyardTime');
     }
 
-    function getRandomDelay() {
-        return Math.floor(Math.random() * (clickDelayMax - clickDelayMin + 1)) + clickDelayMin;
+   function getRandomDelay() {
+        const speed = localStorage.getItem('botCfg_ClickDelay') || 'normal';
+        let min = 200, max = 800;
+
+        if (speed === 'fast') { min = 100; max = 400; }
+        else if (speed === 'normal') { min = 200; max = 800; }
+        else if (speed === 'human') { min = 500; max = 1500; }
+        else if (speed === 'safe') { min = 1000; max = 3000; }
+
+        return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
     function goTo(url) {
@@ -500,7 +592,7 @@
         };
     }
 
-    function applyLevelRestrictionsToGUI(stats) {
+   function applyLevelRestrictionsToGUI(stats) {
         const selectEl = document.getElementById('bot-potion-type');
         if (selectEl && stats) {
             Array.from(selectEl.options).forEach(opt => {
@@ -510,6 +602,20 @@
             if (selectEl.options[selectEl.selectedIndex].disabled) {
                 selectEl.value = 'Mała Uzdrawiająca Mikstura';
                 localStorage.setItem('botCfg_PotionType', 'Mała Uzdrawiająca Mikstura');
+            }
+        }
+
+        // Zabezpieczenie Ruin Pradziejów w GUI
+        const cbRuins = document.getElementById('bot-toggle-ruins');
+        if (cbRuins && stats) {
+            if (stats.level < 50) {
+                cbRuins.disabled = true;
+                cbRuins.parentElement.style.color = '#555';
+                cbRuins.parentElement.title = 'Wymagany 50 poziom postaci!';
+            } else {
+                cbRuins.disabled = false;
+                cbRuins.parentElement.style.color = '#fff';
+                cbRuins.parentElement.title = '';
             }
         }
     }
@@ -618,7 +724,7 @@
     }
 
     async function attemptBuyItem(currentPage, itemName, storageNeedBuy) {
-        if (!currentPage.includes(marketLink.replace("https://s70-pl.bitefight.gameforge.com", ""))) {
+        if (!currentPage.includes(marketLink.replace(baseURL, ""))) {
             goTo(marketLink); return true;
         }
         return new Promise((resolve) => {
@@ -746,7 +852,7 @@
             });
         }
 
-        const targetUrl = `https://s70-pl.bitefight.gameforge.com/ancestral/index?page=1&layerId=${config.id}`;
+        const targetUrl = `${baseURL}/ancestral/index?page=1&layerId=${config.id}`;
         if (!isIndex || !currentPage.includes(`layerId=${config.id}`)) { goTo(targetUrl); return true; }
 
         return new Promise((resolve) => {
@@ -1116,7 +1222,8 @@
 
         const doChurch = localStorage.getItem('botCfg_Church') !== 'false';
         const doClan = localStorage.getItem('botCfg_Clan') !== 'false';
-        const doRuins = localStorage.getItem('botCfg_Ruins') !== 'false';
+        // Ruiny włączają się TYLKO wtedy, gdy są zaznaczone ORAZ gdy poziom postaci to minimum 50
+        const doRuins = localStorage.getItem('botCfg_Ruins') !== 'false' && stats.level >= 50;
         const doHunt = localStorage.getItem('botCfg_Hunt') === 'true';
         const doTrain = localStorage.getItem('botCfg_Train') === 'true';
         const doAttributes = localStorage.getItem('botCfg_Attributes') === 'true';
@@ -1341,7 +1448,22 @@
             if (isDoingGrotte) return;
         }
 
-    }
+    // =========================================================================
+        // TRYB BEZCZYNNOŚCI (IDLE) - Gdy bot nie ma nic do zrobienia
+        // =========================================================================
+        // Jeśli kod dotarł tutaj, oznacza to, że bot nie wywołał "return" (nie kliknął niczego).
+        // Czekamy losowo od 2 do 5 minut i odświeżamy stronę, by sprawdzić liczniki czasu.
+        const idleMin = 2 * 60 * 1000; // 2 minuty
+        const idleMax = 5 * 60 * 1000; // 5 minut
+        const idleTime = Math.floor(Math.random() * (idleMax - idleMin + 1)) + idleMin;
+
+        console.log(`TEST: Brak zadań (Bezczynność). Odświeżę stronę za około ${Math.round(idleTime / 1000 / 60)} min...`);
+
+        setTimeout(() => {
+            window.location.reload();
+        }, idleTime);
+
+    } // Zakończenie funkcji mainLogic
 
     setTimeout(mainLogic, 500);
 
