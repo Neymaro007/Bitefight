@@ -26,7 +26,7 @@ Do uruchomienia skryptu potrzebujesz rozszerzenia obsługującego UserScripts.
 
 1. Zainstaluj dodatek **Tampermonkey** dla Twojej przeglądarki (dostępny dla Chrome, Firefox, Edge, Opera, Safari).
 2. Kliknij w poniższy link do surowego kodu skryptu:
-   👉 **[Zainstaluj skrypt](../../raw/main/bitefight-bot.user.js)** *(Zmień ten link po dodaniu pliku skryptu do swojego repozytorium)*
+   👉 **[Zainstaluj skrypt](../../blob/main/bitefight-bot.user.js)** *(Zmień ten link po dodaniu pliku skryptu do swojego repozytorium)*
 3. Tampermonkey otworzy nową kartę – kliknij przycisk **Zainstaluj** (Install).
 4. Zaloguj się do gry BiteFight. W lewym górnym rogu pojawi się panel sterowania bota.
 
