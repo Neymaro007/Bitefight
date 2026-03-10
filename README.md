@@ -16,6 +16,7 @@ Skrypt został zaprojektowany z naciskiem na bezpieczeństwo oraz optymalizację
 * **🦇 Polowanie w Grocie:** Wybór poziomu trudności i automatyczna walka z demonami.
 * **🩸 Polowanie na ludzi:** Zbieranie Sfer Ekstrakcji określonych rang (np. tylko S, A, B) oraz inteligentne zarządzanie odliczaniem slotów.
 * **🏰 Ruiny Pradziejów:** Automatyczne wystawianie odpowiedniej ilości wojska zależnie od poziomu Ruin i śledzenie czasu odnowienia. Dodatkowo rekrutacja wybranej przez ciebie jednostki.
+* UWAGA! Ilość jednostek jest ustawiona na sztywno (możliwość samodzielnej zmiany w pliku js), w przyszłości dodam więcej poziomów ruin do atakowania.
 * **⛪ Kościół i Cmentarz:** Samodzielne leczenie za PA (do określonego limitu PA) oraz podejmowanie pracy, gdy skończą się punkty akcji.
 * **⚙️ Konfiguracja z poziomu GUI:** Wszystkie funkcje można włączać/wyłączać za pomocą estetycznego panelu w lewym górnym rogu ekranu gry. Zapisywanie ustawień w `localStorage`.
 
