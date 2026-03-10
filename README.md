@@ -35,11 +35,8 @@ Do uruchomienia skryptu potrzebujesz rozszerzenia obsługującego UserScripts.
 
 ## 📸 Zrzuty ekranu (Screenshots)
 
-*(Tutaj warto dodać zrzut ekranu. Zrób screena swojego panelu bota, wrzuć go do repozytorium i podmień poniższy link)*
+<img width="318" height="920" alt="bot1" src="https://github.com/user-attachments/assets/c05d519a-0d71-47b6-874f-f6352df18d86" />
 
-![BiteFight Bot GUI](https://via.placeholder.com/300x500.png?text=Wstaw+tutaj+zrzut+ekranu+swojego+GUI)
-
----
 
 ## ⚠️ Zastrzeżenie (Disclaimer)
 
