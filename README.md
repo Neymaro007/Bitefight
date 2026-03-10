@@ -11,10 +11,11 @@ Skrypt został zaprojektowany z naciskiem na bezpieczeństwo oraz optymalizację
 
 * **🛡️ Inteligentny system leczenia:** Bot dynamicznie analizuje stan HP. Potrafi czytać czas odnowienia (cooldown) mikstur z interfejsu gry w czasie rzeczywistym, unikając zacięć i nieskończonych pętli.
 * **🛒 Automatyczne zakupy:** Gdy brakuje mikstur (życia lub energii), skrypt sam udaje się na Rynek, precyzyjnie wyszukuje odpowiedni przedmiot i go kupuje.
+* **⚔️ Wojny Klanowe:** Bot na bieżąco monitoruje powiadomienia i automatycznie składa meldunek (zapisuje Cię) na nadchodzące wojny klanowe.
 * **🌲 Przygoda w Lesie:** W pełni konfigurowalna logika decyzyjna (np. ścieżka Max EXP i Złoto, dążenie do konkretnych Aspektów).
 * **🦇 Polowanie w Grocie:** Wybór poziomu trudności i automatyczna walka z demonami.
 * **🩸 Polowanie na ludzi:** Zbieranie Sfer Ekstrakcji określonych rang (np. tylko S, A, B) oraz inteligentne zarządzanie odliczaniem slotów.
-* **🏰 Ruiny Pradziejów:** Automatyczne wystawianie odpowiedniej ilości wojska zależnie od poziomu Ruin i śledzenie czasu odnowienia.
+* **🏰 Ruiny Pradziejów:** Automatyczne wystawianie odpowiedniej ilości wojska zależnie od poziomu Ruin i śledzenie czasu odnowienia. Dodatkowo rekrutacja wybranej przez ciebie jednostki.
 * **⛪ Kościół i Cmentarz:** Samodzielne leczenie za PA (do określonego limitu PA) oraz podejmowanie pracy, gdy skończą się punkty akcji.
 * **⚙️ Konfiguracja z poziomu GUI:** Wszystkie funkcje można włączać/wyłączać za pomocą estetycznego panelu w lewym górnym rogu ekranu gry. Zapisywanie ustawień w `localStorage`.
 
