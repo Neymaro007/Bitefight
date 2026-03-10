@@ -35,7 +35,8 @@ Do uruchomienia skryptu potrzebujesz rozszerzenia obsługującego UserScripts.
 
 ## 📸 Zrzuty ekranu (Screenshots)
 
-<img width="318" height="920" alt="bot1" src="https://github.com/user-attachments/assets/c05d519a-0d71-47b6-874f-f6352df18d86" />
+<img width="318" height="920" alt="bot1" src="https://github.com/user-attachments/assets/c05d519a-0d71-47b6-874f-f6352df18d86" /> <img width="318" height="929" alt="bot2" src="https://github.com/user-attachments/assets/ac98a4e4-496f-4795-a9b6-b865377a10f6" />
+
 
 
 ## ⚠️ Zastrzeżenie (Disclaimer)
