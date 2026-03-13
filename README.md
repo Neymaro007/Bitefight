@@ -2,6 +2,12 @@
 
 Zaawansowany skrypt automatyzujący rozgrywkę w przeglądarkowej grze BiteFight. Stworzony w JavaScript jako skrypt użytkownika Neymaro007.
 Projekt posiada wbudowany, intuicyjny panel GUI pozwalający na swobodne zarządzanie akcjami postaci.
+---
+
+![Version](https://img.shields.io/badge/version-28.0-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Tampermonkey-green.svg)
+![Game](https://img.shields.io/badge/game-BiteFight-darkred.svg)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC_BY--NC_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
 ---
 
