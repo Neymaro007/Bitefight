@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      28.0
 // @description  Poprawione zakupy, odczyt HP, Energia (-20 PA), naprawiony trening wojska.
-// @author       Anonymous
+// @author       Neymaro007
 // @match        https://*.bitefight.gameforge.com/*
 // @grant        none
 // @run-at       document-idle
